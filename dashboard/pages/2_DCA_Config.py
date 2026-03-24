@@ -72,8 +72,9 @@ if mode == "simple (v1)":
         )
         daily_amount = st.number_input(
             "Montant quotidien (€)",
-            min_value=1.0, max_value=10000.0, step=1.0,
-            value=current.get("daily_amount_eur", 10.0) if current else 10.0,
+            min_value=5.0, max_value=10000.0, step=1.0,
+            value=max(5.0, current.get("daily_amount_eur", 10.0)) if current else 10.0,
+            help="Minimum 5 € (exigé par Binance)",
         )
         col1, col2 = st.columns(2)
         with col1:
@@ -132,11 +133,11 @@ st.markdown("### 💰 Montant de base quotidien")
 
 base_amount = st.slider(
     "Montant de base (×1) en $",
-    min_value=1.0,
+    min_value=5.0,
     max_value=500.0,
-    value=float((v2_config or {}).get("base_daily_amount", 12.0)),
+    value=max(5.0, float((v2_config or {}).get("base_daily_amount", 12.0))),
     step=1.0,
-    help="C'est le montant investi quand RSI = WARM (×1) et MVRV = FAIR (×1).",
+    help="Minimum 5 $ (exigé par Binance). C'est le montant investi quand RSI = WARM (×1) et MVRV = FAIR (×1).",
 )
 
 # Auto-calcul des paramètres recommandés

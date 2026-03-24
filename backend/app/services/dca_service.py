@@ -159,7 +159,22 @@ def execute_user_dca(uid: str) -> dict | None:
     except BinanceError as e:
         logger.error("DCA order failed for user %s: %s", uid, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
-        _send_error_telegram(uid, f"Ordre DCA échoué : {e.message}")
+        # Message utilisateur clair selon le type d'erreur
+        if "NOTIONAL" in str(e.message).upper():
+            user_msg = (
+                f"⚠️ Montant trop faible pour {symbol}.\n"
+                f"Binance exige un minimum de 5 € par ordre.\n"
+                f"Montant configuré : {daily_amount:.2f} €.\n\n"
+                f"👉 Augmentez votre montant DCA dans le dashboard."
+            )
+        elif "MIN_NOTIONAL" in str(e.message).upper():
+            user_msg = (
+                f"⚠️ Montant trop faible pour {symbol}.\n"
+                f"Augmentez votre montant DCA (minimum 5 €)."
+            )
+        else:
+            user_msg = f"Ordre DCA échoué pour {symbol} : {e.message}"
+        _send_error_telegram(uid, user_msg)
         return None
 
     # 8. Enregistrer l'ordre
@@ -551,7 +566,15 @@ def _place_order_safe(
     except BinanceError as e:
         logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
-        _send_error_telegram(uid, f"Ordre DCA v2 échoué ({symbol}): {e.message}")
+        if "NOTIONAL" in str(e.message).upper():
+            user_msg = (
+                f"⚠️ Montant trop faible pour {symbol}.\n"
+                f"Binance exige un minimum de 5 € par ordre.\n\n"
+                f"👉 Augmentez votre montant DCA de base dans le dashboard."
+            )
+        else:
+            user_msg = f"Ordre DCA v2 échoué ({symbol}): {e.message}"
+        _send_error_telegram(uid, user_msg)
         return None
 
 
