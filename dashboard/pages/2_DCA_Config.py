@@ -71,10 +71,10 @@ if mode == "simple (v1)":
             ),
         )
         daily_amount = st.number_input(
-            "Montant quotidien (€)",
+            "Montant quotidien ($)",
             min_value=5.0, max_value=10000.0, step=1.0,
             value=max(5.0, current.get("daily_amount_eur", 10.0)) if current else 10.0,
-            help="Minimum 5 € (exigé par Binance)",
+            help="Minimum 5 $ (exigé par Binance)",
         )
         col1, col2 = st.columns(2)
         with col1:

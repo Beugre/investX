@@ -73,7 +73,7 @@ else:
         with col1:
             st.metric("Paire", config.get("symbol", "—"))
         with col2:
-            st.metric("Montant quotidien", f"{config.get('daily_amount_eur', 0):.2f} €")
+            st.metric("Montant quotidien", f"${config.get('daily_amount_eur', 0):.2f}")
         with col3:
             enabled = config.get("enabled", False)
             st.metric("DCA", "✅ Activé" if enabled else "❌ Désactivé")

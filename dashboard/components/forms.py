@@ -22,7 +22,7 @@ def dca_config_form(current_config: dict | None = None) -> dict | None:
             index=ALLOWED_SYMBOLS.index(config.get("symbol", "BTCUSDC")),
         )
         daily_amount = st.number_input(
-            "Montant quotidien (€)",
+            "Montant quotidien ($)",
             min_value=0.5,
             max_value=10000.0,
             value=float(config.get("daily_amount_eur", 1.0)),
