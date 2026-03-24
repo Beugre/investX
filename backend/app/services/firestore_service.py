@@ -237,7 +237,35 @@ def save_snapshot(uid: str, data: dict[str, Any]) -> str:
     )
     data["captured_at"] = datetime.now(timezone.utc)
     ref.set(data)
+
+    # Garder uniquement les 100 derniers snapshots
+    _prune_old_snapshots(uid, max_keep=100)
+
     return ref.id
+
+
+def _prune_old_snapshots(uid: str, max_keep: int = 100) -> None:
+    """Supprime les snapshots au-delà des `max_keep` plus récents."""
+    coll = (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("portfolio_snapshots")
+    )
+    # Récupérer tous les snapshots triés du plus récent au plus ancien
+    all_docs = list(
+        coll.order_by("captured_at", direction="DESCENDING")
+        .offset(max_keep)
+        .limit(500)
+        .stream()
+    )
+    if not all_docs:
+        return
+    batch = _db().batch()
+    for doc in all_docs:
+        batch.delete(doc.reference)
+    batch.commit()
+    logger.info("Pruned %d old snapshots for user %s", len(all_docs), uid)
 
 
 def get_latest_snapshot(uid: str, symbol: str) -> dict[str, Any] | None:
