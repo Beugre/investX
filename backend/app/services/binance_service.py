@@ -96,11 +96,37 @@ def place_market_buy_order(
         total_cost = sum(float(f["qty"]) * float(f["price"]) for f in fills)
         avg_price = total_cost / total_qty if total_qty > 0 else 0.0
 
+        # Calculer les frais et la quantité nette réellement reçue
+        total_commission = 0.0
+        commission_asset = ""
+        for f in fills:
+            commission_asset = f.get("commissionAsset", "")
+            total_commission += float(f.get("commission", 0))
+
+        # Si la commission est prise sur l'actif acheté (ex: BTC),
+        # on soustrait pour obtenir la quantité nette détenue
+        base_asset = symbol.replace("USDC", "").replace("USDT", "").replace("EUR", "")
+        if commission_asset == base_asset:
+            net_qty = total_qty - total_commission
+        else:
+            net_qty = total_qty
+
+        logger.info(
+            "Order fills: gross_qty=%.8f, commission=%.8f %s, net_qty=%.8f",
+            total_qty, total_commission, commission_asset, net_qty,
+        )
+
+        # Montant réellement dépensé (peut être < quote_amount à cause du lot size)
+        actual_spent = float(order.get("cummulativeQuoteQty", quote_amount))
+
         return {
             "symbol": symbol,
             "side": "BUY",
-            "amount_eur": quote_amount,
-            "quantity": total_qty,
+            "amount_eur": actual_spent,
+            "quantity": net_qty,
+            "quantity_gross": total_qty,
+            "commission": total_commission,
+            "commission_asset": commission_asset,
             "price": avg_price,
             "status": order.get("status", "FILLED"),
             "exchange_order_id": str(order.get("orderId", "")),

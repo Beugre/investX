@@ -11,15 +11,19 @@ logger = get_logger(__name__)
 
 
 def compute_avg_buy_price(orders: list[dict]) -> float:
-    """Calcule le prix moyen d'achat pondéré à partir de la liste d'ordres."""
+    """Calcule le prix moyen d'achat effectif (coût réel / quantité nette).
+
+    Prend en compte le montant réellement dépensé et la quantité réellement
+    reçue pour donner le coût par unité *frais inclus*.
+    """
     total_qty = 0.0
     total_cost = 0.0
     for o in orders:
         if o.get("status") == "FILLED" and o.get("side") == "BUY":
             qty = float(o.get("quantity", 0))
-            price = float(o.get("price", 0))
+            cost = float(o.get("amount_eur", 0))
             total_qty += qty
-            total_cost += qty * price
+            total_cost += cost
     return total_cost / total_qty if total_qty > 0 else 0.0
 
 
@@ -42,9 +46,38 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
             "pnl_percent": 0.0,
         }
 
-    total_qty = sum(float(o.get("quantity", 0)) for o in filled_orders)
-    total_invested = sum(float(o.get("amount_eur", 0)) for o in filled_orders)
+    total_qty = 0.0
+    total_invested = 0.0
+    total_commission = 0.0
+    commission_asset = ""
+
+    for o in filled_orders:
+        qty = float(o.get("quantity", 0))
+        cost = float(o.get("amount_eur", 0))
+
+        if "commission" in o:
+            # Nouvel ordre post-fix : quantity = nette, amount_eur = réel
+            total_commission += float(o.get("commission", 0))
+            if not commission_asset:
+                commission_asset = o.get("commission_asset", "")
+        else:
+            # Ancien ordre pré-fix : quantity = brute, amount_eur = demandé
+            # Appliquer les corrections estimées
+            estimated_fee = qty * 0.001          # 0.1 % Binance
+            qty -= estimated_fee                  # quantité nette estimée
+            cost = qty * float(o.get("price", 0))  # coût réel estimé
+            total_commission += estimated_fee
+            if not commission_asset:
+                # Déduire l'actif base du symbol
+                sym = o.get("symbol", "")
+                commission_asset = sym.replace("USDC", "").replace("USDT", "").replace("EUR", "")
+
+        total_qty += qty
+        total_invested += cost
+
     avg_price = compute_avg_buy_price(filled_orders)
+    # Recalcul depuis les données corrigées pour cohérence
+    avg_price = total_invested / total_qty if total_qty > 0 else 0.0
 
     # Récupérer le prix actuel via Binance
     market_price = 0.0
@@ -69,6 +102,8 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
         "market_value_eur": market_value,
         "pnl_value_eur": pnl_value,
         "pnl_percent": round(pnl_percent, 2),
+        "total_commission": total_commission,
+        "commission_asset": commission_asset,
     }
 
 
