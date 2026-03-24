@@ -1,101 +1,98 @@
 """
-Service Google Secret Manager – gestion sécurisée des credentials Binance.
+Service de stockage sécurisé des credentials Binance.
+Utilise Firestore + chiffrement Fernet (AES-128-CBC) au lieu de GCP Secret Manager.
+La clé de chiffrement est définie via la variable d'environnement ENCRYPTION_KEY.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import base64
+import hashlib
 
-from google.cloud import secretmanager
+from cryptography.fernet import Fernet
 
-from app.config import settings
 from app.core.exceptions import SecretManagerError
 from app.logger import get_logger
 
 logger = get_logger(__name__)
 
-_client: secretmanager.SecretManagerServiceClient | None = None
+_fernet: Fernet | None = None
 
 
-def _get_client() -> secretmanager.SecretManagerServiceClient:
-    global _client
-    if _client is None:
-        _client = secretmanager.SecretManagerServiceClient()
-    return _client
+def _get_fernet() -> Fernet:
+    """Initialise le chiffreur Fernet à partir de ENCRYPTION_KEY."""
+    global _fernet
+    if _fernet is None:
+        raw_key = os.environ.get("ENCRYPTION_KEY", "")
+        if not raw_key:
+            # Auto-générer une clé déterministe à partir du project ID (fallback)
+            from app.config import settings
+            raw_key = settings.firebase_project_id + "-investx-secret-key"
+            logger.warning("ENCRYPTION_KEY not set, using derived key (set it in .env for production)")
+        # Dériver une clé Fernet valide (32 bytes base64) depuis n'importe quelle chaîne
+        key_bytes = hashlib.sha256(raw_key.encode()).digest()
+        fernet_key = base64.urlsafe_b64encode(key_bytes)
+        _fernet = Fernet(fernet_key)
+    return _fernet
 
 
-def _secret_name(uid: str) -> str:
-    return f"binance-user-{uid}"
-
-
-def _secret_path(uid: str) -> str:
-    return f"projects/{settings.firebase_project_id}/secrets/{_secret_name(uid)}"
+def _get_firestore_db():
+    """Récupère le client Firestore."""
+    from app.services.firestore_service import _get_db
+    return _get_db()
 
 
 def create_or_update_binance_secret(uid: str, api_key: str, api_secret: str) -> str:
-    """Crée ou met à jour le secret Binance pour un utilisateur.
-    Retourne la référence au secret (secret_ref).
+    """Chiffre et stocke les credentials Binance dans Firestore.
+    Retourne une référence (secret_ref).
     """
-    client = _get_client()
-    project_path = f"projects/{settings.firebase_project_id}"
-    secret_id = _secret_name(uid)
-    payload = json.dumps({"api_key": api_key, "api_secret": api_secret}).encode("utf-8")
-
     try:
-        # Essayer de créer le secret
-        client.create_secret(
-            request={
-                "parent": project_path,
-                "secret_id": secret_id,
-                "secret": {"replication": {"automatic": {}}},
-            }
-        )
-        logger.info("Secret created for user %s", uid)
-    except Exception as e:
-        if "ALREADY_EXISTS" in str(e):
-            logger.info("Secret already exists for user %s, adding new version", uid)
-        else:
-            logger.error("Failed to create secret for user %s: %s", uid, e)
-            raise SecretManagerError(f"Failed to create secret: {e}") from e
+        fernet = _get_fernet()
+        payload = json.dumps({"api_key": api_key, "api_secret": api_secret})
+        encrypted = fernet.encrypt(payload.encode("utf-8")).decode("utf-8")
 
-    try:
-        # Ajouter une nouvelle version
-        client.add_secret_version(
-            request={
-                "parent": _secret_path(uid),
-                "payload": {"data": payload},
-            }
-        )
-        secret_ref = f"{_secret_path(uid)}/versions/latest"
-        logger.info("Secret version added for user %s", uid)
+        db = _get_firestore_db()
+        doc_ref = db.collection("binance_secrets").document(uid)
+        doc_ref.set({"encrypted_credentials": encrypted})
+
+        secret_ref = f"firestore://binance_secrets/{uid}"
+        logger.info("Binance credentials stored (encrypted) for user %s", uid)
         return secret_ref
     except Exception as e:
-        logger.error("Failed to add secret version for user %s: %s", uid, e)
-        raise SecretManagerError(f"Failed to add secret version: {e}") from e
+        logger.error("Failed to store Binance credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to store credentials: {e}") from e
 
 
 def get_binance_secret(uid: str) -> dict[str, str]:
-    """Récupère les credentials Binance depuis Secret Manager.
+    """Déchiffre et retourne les credentials Binance.
     Retourne {"api_key": "...", "api_secret": "..."}.
     """
-    client = _get_client()
-    version_path = f"{_secret_path(uid)}/versions/latest"
-
     try:
-        response = client.access_secret_version(request={"name": version_path})
-        data = json.loads(response.payload.data.decode("utf-8"))
+        db = _get_firestore_db()
+        doc = db.collection("binance_secrets").document(uid).get()
+        if not doc.exists:
+            raise SecretManagerError(f"No Binance credentials found for user {uid}")
+
+        encrypted = doc.to_dict()["encrypted_credentials"]
+        fernet = _get_fernet()
+        decrypted = fernet.decrypt(encrypted.encode("utf-8")).decode("utf-8")
+        data = json.loads(decrypted)
         return {"api_key": data["api_key"], "api_secret": data["api_secret"]}
+    except SecretManagerError:
+        raise
     except Exception as e:
-        logger.error("Failed to access secret for user %s: %s", uid, e)
-        raise SecretManagerError(f"Failed to access secret: {e}") from e
+        logger.error("Failed to retrieve Binance credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to retrieve credentials: {e}") from e
 
 
 def delete_binance_secret(uid: str) -> None:
-    """Supprime le secret Binance d'un utilisateur."""
-    client = _get_client()
+    """Supprime les credentials Binance chiffrées."""
     try:
-        client.delete_secret(request={"name": _secret_path(uid)})
-        logger.info("Secret deleted for user %s", uid)
+        db = _get_firestore_db()
+        db.collection("binance_secrets").document(uid).delete()
+        logger.info("Binance credentials deleted for user %s", uid)
     except Exception as e:
-        logger.error("Failed to delete secret for user %s: %s", uid, e)
-        raise SecretManagerError(f"Failed to delete secret: {e}") from e
+        logger.error("Failed to delete Binance credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to delete credentials: {e}") from e
