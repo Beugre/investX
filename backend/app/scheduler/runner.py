@@ -7,6 +7,7 @@ from __future__ import annotations
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.services.dca_service import run_cycle
+from app.scheduler.jobs import portfolio_refresh_job
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,7 +16,7 @@ scheduler = BackgroundScheduler()
 
 
 def start_scheduler() -> None:
-    """Démarre le scheduler DCA (exécution toutes les minutes)."""
+    """Démarre le scheduler DCA + refresh portfolio (toutes les minutes)."""
     scheduler.add_job(
         run_cycle,
         trigger="interval",
@@ -24,8 +25,16 @@ def start_scheduler() -> None:
         replace_existing=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        portfolio_refresh_job,
+        trigger="interval",
+        minutes=1,
+        id="portfolio_refresh",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
-    logger.info("DCA scheduler started (interval: 1 minute)")
+    logger.info("Scheduler started (DCA cycle + portfolio refresh, interval: 1 min)")
 
 
 def stop_scheduler() -> None:
