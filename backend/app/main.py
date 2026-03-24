@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.logger import get_logger
 from app.scheduler.runner import start_scheduler, stop_scheduler
+from app.services.telegram_bot import start_bot as start_telegram_bot, stop_bot as stop_telegram_bot
 
 # Import des routers
 from app.api.health import router as health_router
@@ -51,9 +52,11 @@ async def lifespan(app: FastAPI):
     # Startup
     _init_firebase()
     start_scheduler()
+    start_telegram_bot()
     logger.info("InvestX backend started (env: %s)", settings.app_env)
     yield
     # Shutdown
+    await stop_telegram_bot()
     stop_scheduler()
     logger.info("InvestX backend stopped")
 

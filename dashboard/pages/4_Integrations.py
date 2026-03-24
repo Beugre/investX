@@ -133,9 +133,10 @@ else:
     st.warning("Telegram non lié.")
     st.markdown("""
     **Instructions :**
-    1. Ouvrez le bot InvestX sur Telegram
-    2. Envoyez `/start`
-    3. Copiez votre **chat_id** et collez-le ci-dessous
+    1. Ouvrez le bot **[@InvestX_The_Bot](https://t.me/InvestX_The_Bot)** sur Telegram
+    2. Cliquez sur **Démarrer** ou envoyez `/start`
+    3. Le bot vous enverra votre **Chat ID** — copiez-le
+    4. Collez-le ci-dessous
     """)
 
     with st.form("telegram_link_form"):
