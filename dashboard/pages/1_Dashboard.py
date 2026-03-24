@@ -1,8 +1,10 @@
 """
 Page 1 – Dashboard : vue d'ensemble du portfolio.
+Auto-refresh toutes les 60 secondes.
 """
 
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 from components.auth_guard import require_auth
 from components.metrics import display_kpi_row, display_price_info
@@ -18,6 +20,10 @@ from services.api_client import (
 )
 
 st.set_page_config(page_title="Dashboard – InvestX", page_icon="📊", layout="wide")
+
+# Auto-refresh toutes les 60 secondes (60000 ms)
+st_autorefresh(interval=60_000, limit=None, key="dashboard_autorefresh")
+
 st.title("📊 Dashboard")
 
 token = require_auth()
