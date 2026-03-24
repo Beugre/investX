@@ -31,6 +31,8 @@ class PortfolioSnapshot(BaseModel):
     market_value_eur: float = 0.0
     pnl_value_eur: float = 0.0
     pnl_percent: float = 0.0
+    total_commission: float = 0.0
+    commission_asset: str = ""
     captured_at: datetime | None = None
 
 
