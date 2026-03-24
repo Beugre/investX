@@ -31,7 +31,7 @@ async def refresh_all_snapshots():
         config = firestore_service.get_dca_config(uid)
         if not config:
             continue
-        symbol = config.get("symbol", "BTCEUR")
+        symbol = config.get("symbol", "BTCUSDC")
         try:
             portfolio_service.refresh_snapshot(uid, symbol)
             refreshed += 1

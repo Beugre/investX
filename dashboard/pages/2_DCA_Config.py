@@ -61,12 +61,12 @@ if mode == "simple (v1)":
         )
         symbol = st.selectbox(
             "Paire",
-            ["BTCEUR", "ETHEUR", "BTCUSDT", "ETHUSDT"],
+            ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"],
             index=(
-                ["BTCEUR", "ETHEUR", "BTCUSDT", "ETHUSDT"].index(
-                    current.get("symbol", "BTCEUR")
+                ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"].index(
+                    current.get("symbol", "BTCUSDC")
                 )
-                if current and current.get("symbol") in ["BTCEUR", "ETHEUR", "BTCUSDT", "ETHUSDT"]
+                if current and current.get("symbol") in ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
                 else 0
             ),
         )

@@ -22,7 +22,7 @@ async def get_portfolio_summary(uid: str = Depends(get_current_uid)):
     if not config:
         return PortfolioSummary()
 
-    symbol = config.get("symbol", "BTCEUR")
+    symbol = config.get("symbol", "BTCUSDC")
 
     # Essayer d'utiliser le dernier snapshot en base
     snap = firestore_service.get_latest_snapshot(uid, symbol)
@@ -59,7 +59,7 @@ async def list_orders(
 @router.get("/orders/latest", response_model=Optional[OrderRead])
 async def get_latest_order(
     uid: str = Depends(get_current_uid),
-    symbol: str = Query("BTCEUR"),
+    symbol: str = Query("BTCUSDC"),
 ):
     """Retourne le dernier ordre pour un symbole."""
     order = firestore_service.get_latest_order(uid, symbol)

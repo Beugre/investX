@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-ALLOWED_SYMBOLS = ["BTCEUR", "ETHEUR", "BNBEUR", "ADAEUR", "SOLEUR"]
+ALLOWED_SYMBOLS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
 HOURS = list(range(24))
 MINUTES = [0, 15, 30, 45]
 
@@ -19,7 +19,7 @@ def dca_config_form(current_config: dict | None = None) -> dict | None:
         symbol = st.selectbox(
             "Paire",
             ALLOWED_SYMBOLS,
-            index=ALLOWED_SYMBOLS.index(config.get("symbol", "BTCEUR")),
+            index=ALLOWED_SYMBOLS.index(config.get("symbol", "BTCUSDC")),
         )
         daily_amount = st.number_input(
             "Montant quotidien (€)",

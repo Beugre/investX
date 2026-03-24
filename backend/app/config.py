@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # ── Defaults ──
     default_timezone: str = Field("Europe/Paris", alias="DEFAULT_TIMEZONE")
     allowed_symbols: str = Field(
-        "BTCEUR,ETHEUR,BNBEUR,ADAEUR,SOLEUR", alias="ALLOWED_SYMBOLS"
+        "BTCUSDC,ETHUSDC,BNBUSDC,ADAUSDC,SOLUSDC", alias="ALLOWED_SYMBOLS"
     )
 
     @property

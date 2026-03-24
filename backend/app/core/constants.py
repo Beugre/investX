@@ -6,21 +6,18 @@ from typing import Final
 
 # ── Paires autorisées ──
 ALLOWED_SYMBOLS: Final[list[str]] = [
-    "BTCEUR",
-    "ETHEUR",
-    "BTCUSDT",
-    "ETHUSDT",
-    "BNBEUR",
-    "ADAEUR",
-    "SOLEUR",
+    "BTCUSDC",
+    "ETHUSDC",
+    "BNBUSDC",
+    "ADAUSDC",
+    "SOLUSDC",
 ]
 
 # ── Paires DCA RSI v2 ──
-DCA_V2_BTC_SYMBOLS: Final[list[str]] = ["BTCEUR", "BTCUSDT"]
-DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHEUR", "ETHUSDT"]
+DCA_V2_BTC_SYMBOLS: Final[list[str]] = ["BTCUSDC"]
+DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHUSDC"]
 DCA_V2_VALID_PAIRS: Final[dict[str, dict[str, str]]] = {
-    "EUR": {"btc": "BTCEUR", "eth": "ETHEUR"},
-    "USD": {"btc": "BTCUSDT", "eth": "ETHUSDT"},
+    "USDC": {"btc": "BTCUSDC", "eth": "ETHUSDC"},
 }
 
 # ── Timezone par défaut ──

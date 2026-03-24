@@ -15,7 +15,7 @@ token = require_auth()
 if not token:
     st.stop()
 
-SYMBOLS = ["", "BTCEUR", "ETHEUR", "BNBEUR", "ADAEUR", "SOLEUR"]
+SYMBOLS = ["", "BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
 
 tab_orders, tab_snapshots = st.tabs(["📋 Ordres", "📸 Snapshots"])
 

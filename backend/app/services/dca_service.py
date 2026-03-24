@@ -236,8 +236,8 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
         audit_service.log_dca_failed(uid, "multi", str(e))
         return None
 
-    quote = config.get("quote_currency", "EUR")
-    pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["EUR"])
+    quote = config.get("quote_currency", "USDC")
+    pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
     btc_symbol = pairs["btc"]
     eth_symbol = pairs["eth"]
     base_amount = config.get("base_daily_amount", 12.0)
@@ -672,8 +672,8 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
     if not config:
         return {"error": "No v2 config found"}
 
-    quote = config.get("quote_currency", "EUR")
-    pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["EUR"])
+    quote = config.get("quote_currency", "USDC")
+    pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
     btc_symbol = pairs["btc"]
     base_amount = config.get("base_daily_amount", 12.0)
 

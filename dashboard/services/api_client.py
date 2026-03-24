@@ -196,7 +196,7 @@ def get_orders(token: str, symbol: str | None = None, limit: int = 50) -> list:
     return _get("/orders", token, params=params)
 
 
-def get_latest_order(token: str, symbol: str = "BTCEUR") -> dict | None:
+def get_latest_order(token: str, symbol: str = "BTCUSDC") -> dict | None:
     return _get("/orders/latest", token, params={"symbol": symbol})
 
 
