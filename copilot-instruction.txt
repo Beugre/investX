@@ -1,0 +1,823 @@
+copilot-instruction
+
+Je veux construire un SaaS MVP de DCA crypto multi-utilisateur.
+
+Objectif produit :
+- L’utilisateur crée un compte
+- Il souscrit à un abonnement mensuel via Stripe
+- Il connecte son compte Binance avec une API key et un API secret
+- Les secrets Binance ne doivent JAMAIS être stockés en clair dans Firestore
+- Les secrets doivent être stockés dans Google Secret Manager
+- L’utilisateur configure son DCA :
+  - paire (liste fermée au début)
+  - montant quotidien
+  - heure d’exécution
+  - notifications Telegram activées ou non
+- Un scheduler backend exécute automatiquement les achats DCA pour chaque utilisateur actif
+- Le backend vérifie toujours que l’abonnement Stripe est actif avant d’exécuter un achat
+- L’utilisateur voit un dashboard Streamlit avec :
+  - capital investi
+  - quantité détenue
+  - prix moyen
+  - valeur actuelle
+  - pnl valeur
+  - pnl pourcentage
+  - historique des achats
+  - statut de l’abonnement
+  - configuration DCA modifiable
+- Chaque utilisateur ne doit voir QUE ses propres données
+- Authentification via Firebase Auth
+- Base applicative via Firestore
+- Gestion des secrets via Google Secret Manager
+- Paiement mensuel via Stripe subscriptions + webhooks
+- Notifications achat/erreurs via Telegram bot unique avec chat_id par utilisateur
+- Backend Python FastAPI
+- Projet prêt pour déploiement sur VPS ou Google Cloud Run plus tard
+
+Contraintes importantes :
+- Ne jamais gérer l’argent des utilisateurs directement
+- Les utilisateurs gardent leurs fonds sur leur propre compte Binance
+- Les clés Binance doivent être trading only, sans retrait
+- Séparer clairement backend, dashboard, scheduler et intégrations externes
+- Prévoir logs, gestion des erreurs et audit minimal
+- Prévoir architecture propre dès le départ, même si MVP
+- Utiliser une whitelist de paires au début : BTCEUR, ETHEUR, BNBEUR, ADAEUR, SOLEUR
+- Timezone par défaut : Europe/Paris
+
+Je veux :
+1. l’architecture technique complète
+2. la structure des dossiers
+3. les modèles de données Firestore
+4. les endpoints FastAPI
+5. la logique Stripe webhook
+6. la logique Secret Manager
+7. la logique Telegram
+8. la logique Streamlit multi-utilisateur
+9. la logique du scheduler DCA
+10. les règles de sécurité minimales
+11. un plan d’implémentation par étapes
+12. du code propre, modulaire, typé, et prêt pour MVP
+1. Vision produit
+Ce que fait le produit
+
+C’est un outil SaaS d’automatisation DCA.
+
+Le produit :
+
+facture un abonnement mensuel
+laisse l’utilisateur connecter Binance via API
+exécute des achats programmés
+affiche un dashboard de suivi
+envoie des notifications Telegram
+
+Le produit ne :
+
+reçoit pas l’argent des clients
+ne détient pas les fonds
+ne prélève pas sa commission dans Binance
+ne promet pas de rendement
+2. Architecture cible
+Architecture simple et propre pour MVP
+Front
+Streamlit
+pages :
+login
+dashboard
+configuration DCA
+abonnement
+intégrations
+historique
+Auth
+Firebase Auth
+login email/password au début
+uid Firebase comme identifiant principal
+Base applicative
+Cloud Firestore
+données utilisateur
+configs DCA
+ordres
+snapshots portefeuille
+paramètres Telegram
+état d’abonnement
+Gestion des secrets
+Google Secret Manager
+un secret par utilisateur pour les credentials Binance
+Firestore ne stocke qu’une référence du secret
+Backend
+FastAPI
+API interne et dashboard backend
+vérification auth
+logique métier
+intégrations Binance / Stripe / Telegram / Secret Manager / Firestore
+Facturation
+Stripe Subscriptions
+checkout
+portal client
+webhooks pour mettre à jour le statut d’abonnement
+Stripe recommande les webhooks pour réagir aux événements de paiement et de changement d’état d’abonnement, par exemple invoice.paid et invoice.payment_failed.
+Scheduler
+pour le MVP : APScheduler ou boucle cron interne
+exécute les ordres pour les utilisateurs actifs
+tourne côté backend
+Notifications
+Telegram Bot API
+un bot unique
+un chat_id par utilisateur
+3. Structure de projet recommandée
+dca-saas/
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── logger.py
+│   │   │
+│   │   ├── api/
+│   │   │   ├── auth.py
+│   │   │   ├── users.py
+│   │   │   ├── dca.py
+│   │   │   ├── binance.py
+│   │   │   ├── telegram.py
+│   │   │   ├── stripe.py
+│   │   │   ├── portfolio.py
+│   │   │   └── health.py
+│   │   │
+│   │   ├── core/
+│   │   │   ├── security.py
+│   │   │   ├── auth_firebase.py
+│   │   │   ├── constants.py
+│   │   │   └── exceptions.py
+│   │   │
+│   │   ├── models/
+│   │   │   ├── user_models.py
+│   │   │   ├── dca_models.py
+│   │   │   ├── stripe_models.py
+│   │   │   ├── telegram_models.py
+│   │   │   └── portfolio_models.py
+│   │   │
+│   │   ├── schemas/
+│   │   │   ├── user.py
+│   │   │   ├── dca.py
+│   │   │   ├── stripe.py
+│   │   │   ├── telegram.py
+│   │   │   └── portfolio.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── firestore_service.py
+│   │   │   ├── secret_manager_service.py
+│   │   │   ├── stripe_service.py
+│   │   │   ├── telegram_service.py
+│   │   │   ├── binance_service.py
+│   │   │   ├── dca_service.py
+│   │   │   ├── portfolio_service.py
+│   │   │   ├── subscription_service.py
+│   │   │   └── audit_service.py
+│   │   │
+│   │   ├── repositories/
+│   │   │   ├── user_repository.py
+│   │   │   ├── dca_repository.py
+│   │   │   ├── order_repository.py
+│   │   │   ├── portfolio_repository.py
+│   │   │   └── subscription_repository.py
+│   │   │
+│   │   ├── scheduler/
+│   │   │   ├── jobs.py
+│   │   │   ├── runner.py
+│   │   │   └── locks.py
+│   │   │
+│   │   └── utils/
+│   │       ├── datetime_utils.py
+│   │       ├── money_utils.py
+│   │       └── validators.py
+│   │
+│   ├── tests/
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── dashboard/
+│   ├── streamlit_app.py
+│   ├── pages/
+│   │   ├── 1_Dashboard.py
+│   │   ├── 2_DCA_Config.py
+│   │   ├── 3_Subscription.py
+│   │   ├── 4_Integrations.py
+│   │   ├── 5_History.py
+│   │   └── 6_Settings.py
+│   ├── components/
+│   │   ├── auth_guard.py
+│   │   ├── metrics.py
+│   │   ├── tables.py
+│   │   └── forms.py
+│   ├── services/
+│   │   ├── api_client.py
+│   │   └── auth_client.py
+│   └── .streamlit/
+│       └── config.toml
+│
+├── infra/
+│   ├── firestore.rules
+│   ├── firebase.json
+│   ├── cloudbuild.yaml
+│   ├── nginx.conf
+│   └── systemd/
+│       ├── backend.service
+│       ├── dashboard.service
+│       └── scheduler.service
+│
+├── docs/
+│   ├── architecture.md
+│   ├── api_contract.md
+│   ├── firestore_schema.md
+│   └── runbook.md
+│
+└── README.md
+4. Modèle de données Firestore
+
+Firestore doit contenir les données métier, pas les secrets Binance. Les règles de sécurité Firestore servent à limiter l’accès par utilisateur.
+
+Collection users/{uid}
+{
+  "uid": "firebase_uid",
+  "email": "user@example.com",
+  "display_name": "Yoann",
+  "created_at": "timestamp",
+  "updated_at": "timestamp",
+  "is_active": true,
+  "timezone": "Europe/Paris",
+  "role": "user"
+}
+Collection users/{uid}/subscription/main
+{
+  "provider": "stripe",
+  "customer_id": "cus_xxx",
+  "subscription_id": "sub_xxx",
+  "status": "active",
+  "price_id": "price_xxx",
+  "current_period_end": "timestamp",
+  "cancel_at_period_end": false,
+  "last_event_id": "evt_xxx",
+  "updated_at": "timestamp"
+}
+Collection users/{uid}/dca_config/main
+{
+  "enabled": true,
+  "symbol": "BTCEUR",
+  "daily_amount_eur": 1.0,
+  "execution_hour": 10,
+  "execution_minute": 0,
+  "timezone": "Europe/Paris",
+  "mode": "simple",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+Collection users/{uid}/binance_account/main
+{
+  "exchange": "binance",
+  "secret_ref": "projects/PROJECT_ID/secrets/binance-user-UID/versions/latest",
+  "label": "Main Binance Account",
+  "is_connected": true,
+  "permissions_validated": true,
+  "last_validation_at": "timestamp",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+Collection users/{uid}/telegram/main
+{
+  "enabled": true,
+  "chat_id": "123456789",
+  "username": "telegram_user",
+  "notify_orders": true,
+  "notify_errors": true,
+  "notify_subscription": true,
+  "linked_at": "timestamp",
+  "updated_at": "timestamp"
+}
+Collection users/{uid}/orders/{order_id}
+{
+  "symbol": "BTCEUR",
+  "side": "BUY",
+  "amount_eur": 1.0,
+  "quantity": 0.00001234,
+  "price": 81000.0,
+  "status": "FILLED",
+  "exchange_order_id": "123456789",
+  "executed_at": "timestamp",
+  "source": "scheduler",
+  "error_message": null
+}
+Collection users/{uid}/portfolio_snapshots/{snapshot_id}
+{
+  "symbol": "BTCEUR",
+  "quantity_total": 0.0012,
+  "invested_total_eur": 120.0,
+  "avg_buy_price": 79000.0,
+  "market_price": 82000.0,
+  "market_value_eur": 98.4,
+  "pnl_value_eur": 3.4,
+  "pnl_percent": 3.58,
+  "captured_at": "timestamp"
+}
+Collection users/{uid}/audit_logs/{log_id}
+{
+  "action": "DCA_ORDER_EXECUTED",
+  "status": "SUCCESS",
+  "message": "Daily DCA order executed",
+  "context": {
+    "symbol": "BTCEUR",
+    "amount_eur": 1.0
+  },
+  "created_at": "timestamp"
+}
+5. Secret Manager
+
+Secret Manager est prévu pour stocker et gérer des secrets comme des API keys, mots de passe et certificats.
+
+Règle
+
+Ne jamais stocker api_key et api_secret Binance en clair dans Firestore.
+
+Convention
+
+Créer un secret par utilisateur :
+
+binance-user-{uid}
+
+Contenu JSON du secret :
+
+{
+  "api_key": "BINANCE_API_KEY",
+  "api_secret": "BINANCE_API_SECRET"
+}
+Firestore stocke seulement la référence
+
+Exemple :
+
+{
+  "secret_ref": "projects/my-project/secrets/binance-user-abc123/versions/latest"
+}
+Logique backend
+création/rotation/suppression du secret via service dédié
+lecture du secret uniquement au moment :
+du test de connexion Binance
+de l’exécution d’un ordre
+d’une validation des permissions
+6. Stripe
+
+Stripe est le meilleur choix ici pour les abonnements récurrents, la gestion du cycle de vie et les webhooks.
+
+Flux Stripe
+utilisateur crée un compte
+utilisateur clique “S’abonner”
+backend crée une session Stripe Checkout
+utilisateur paie
+Stripe envoie les webhooks
+backend met à jour subscription.status
+Événements Stripe à gérer
+checkout.session.completed
+customer.subscription.created
+customer.subscription.updated
+customer.subscription.deleted
+invoice.paid
+invoice.payment_failed
+Règle métier simple
+
+Le bot n’exécute un DCA que si :
+
+subscription_status == "active"
+Comportement recommandé
+active → trading autorisé
+past_due → suspendre nouveaux achats
+canceled → suspendre
+incomplete → suspendre
+7. API FastAPI à exposer
+Auth / user
+GET /health
+GET /me
+POST /onboarding/init
+GET /me/profile
+Subscription
+POST /billing/create-checkout-session
+POST /billing/create-customer-portal-session
+POST /billing/webhook
+GET /billing/status
+Binance
+POST /binance/connect
+POST /binance/validate
+DELETE /binance/disconnect
+GET /binance/status
+DCA config
+GET /dca/config
+PUT /dca/config
+POST /dca/enable
+POST /dca/disable
+Portfolio
+GET /portfolio/summary
+GET /portfolio/history
+GET /orders
+GET /orders/latest
+Telegram
+POST /telegram/link
+POST /telegram/test
+PUT /telegram/settings
+GET /telegram/settings
+Admin internal
+POST /internal/run-dca-cycle
+POST /internal/refresh-snapshots
+POST /internal/reconcile-subscriptions
+8. Schémas Pydantic utiles
+DCAConfigUpdate
+class DCAConfigUpdate(BaseModel):
+    enabled: bool
+    symbol: Literal["BTCEUR", "ETHEUR", "BNBEUR", "ADAEUR", "SOLEUR"]
+    daily_amount_eur: condecimal(gt=0, decimal_places=2)
+    execution_hour: conint(ge=0, le=23)
+    execution_minute: conint(ge=0, le=59)
+    timezone: str = "Europe/Paris"
+    mode: Literal["simple"] = "simple"
+BinanceConnectRequest
+class BinanceConnectRequest(BaseModel):
+    api_key: str
+    api_secret: str
+TelegramSettingsUpdate
+class TelegramSettingsUpdate(BaseModel):
+    enabled: bool
+    notify_orders: bool
+    notify_errors: bool
+    notify_subscription: bool
+9. Scheduler DCA
+MVP
+
+Utiliser un scheduler simple, une fois par minute.
+
+À chaque cycle :
+
+récupérer les utilisateurs actifs
+vérifier abonnement
+vérifier config DCA activée
+vérifier si l’heure d’exécution correspond
+récupérer clés Binance depuis Secret Manager
+passer l’ordre
+enregistrer l’ordre
+recalculer snapshot
+envoyer Telegram
+Pseudocode
+def run_dca_cycle():
+    users = get_active_users()
+
+    for user in users:
+        if not is_subscription_active(user.uid):
+            continue
+
+        config = get_dca_config(user.uid)
+        if not config or not config.enabled:
+            continue
+
+        if not should_run_now(config):
+            continue
+
+        if already_executed_today(user.uid, config.symbol):
+            continue
+
+        credentials = load_binance_credentials(user.uid)
+        order = place_market_buy_order(
+            api_key=credentials.api_key,
+            api_secret=credentials.api_secret,
+            symbol=config.symbol,
+            quote_amount=config.daily_amount_eur,
+        )
+
+        save_order(user.uid, order)
+        refresh_portfolio_snapshot(user.uid, config.symbol)
+
+        if telegram_enabled(user.uid):
+            send_order_notification(user.uid, order)
+Verrous
+
+Prévoir un verrou anti double exécution :
+
+lock Firestore
+ou idempotency key par uid + date + symbol
+10. Binance : logique minimale
+À la connexion
+
+Quand l’utilisateur connecte Binance :
+
+tester les credentials
+vérifier permissions
+refuser si retrait activé
+stocker dans Secret Manager
+enregistrer la référence en Firestore
+Bonnes pratiques
+demander API trading only
+pas de retrait
+IP whitelist plus tard
+limiter au spot au début
+11. Telegram
+Modèle
+
+Un seul bot Telegram pour toute l’application.
+
+Flux
+utilisateur clique sur le bot
+fait /start
+le bot répond avec un code ou un message de liaison
+backend associe chat_id au uid
+Notifications à envoyer
+achat exécuté
+erreur d’ordre
+abonnement suspendu
+Binance déconnecté
+Exemple de message
+✅ Achat DCA exécuté
+
+Paire : BTCEUR
+Montant : 1,00 €
+Quantité : 0,00001234 BTC
+Prix : 81 000 €
+Heure : 10:00 Europe/Paris
+12. Streamlit multi-utilisateur
+
+Streamlit fournit un état par session utilisateur avec st.session_state, ce qui convient pour un MVP multi-utilisateur tant que toutes les lectures backend sont filtrées par l’utilisateur authentifié.
+
+Important
+
+Streamlit ne doit jamais lire “toutes les données”.
+Il doit toujours appeler le backend avec le token du user, puis le backend filtre par uid.
+
+Pages Streamlit
+1_Dashboard.py
+abonnement actif / inactif
+paire configurée
+montant quotidien
+KPI :
+investi total
+quantité détenue
+valeur actuelle
+pnl
+courbe historique
+dernier ordre
+2_DCA_Config.py
+selectbox paire
+number_input montant quotidien
+selectbox heure
+toggle activation
+bouton sauvegarder
+3_Subscription.py
+statut
+date de renouvellement
+bouton “gérer mon abonnement”
+bouton “s’abonner”
+4_Integrations.py
+état Binance
+reconnecter Binance
+état Telegram
+tester notification
+5_History.py
+table ordres
+snapshots
+logs
+6_Settings.py
+timezone
+préférences générales
+Gestion de session
+if "user" not in st.session_state:
+    st.stop()
+
+Mais la vraie source de vérité reste :
+
+Firebase token
+backend FastAPI
+Firestore filtré par uid
+13. Firestore Security Rules minimales
+
+Les Security Rules doivent empêcher un utilisateur de lire ou écrire les documents d’un autre utilisateur.
+
+Exemple conceptuel :
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
+
+Important :
+
+le frontend ne doit jamais pouvoir accéder aux secrets
+Secret Manager reste côté backend uniquement
+l’Admin SDK backend contourne les rules, donc toute logique serveur doit être propre et restrictive
+14. Services backend à implémenter
+firestore_service.py
+get_user
+update_user
+get_subscription
+update_subscription
+get_dca_config
+update_dca_config
+save_order
+list_orders
+save_snapshot
+get_latest_snapshot
+secret_manager_service.py
+create_or_update_binance_secret(uid, api_key, api_secret)
+get_binance_secret(uid)
+delete_binance_secret(uid)
+stripe_service.py
+create_checkout_session(uid, email)
+create_customer_portal_session(customer_id)
+verify_webhook_signature(payload, signature)
+handle_event(event)
+binance_service.py
+validate_credentials(api_key, api_secret)
+get_permissions(api_key, api_secret)
+place_market_buy_order(symbol, quote_amount)
+get_asset_balances()
+get_symbol_price(symbol)
+portfolio_service.py
+compute_avg_buy_price(orders)
+compute_snapshot(uid, symbol)
+refresh_snapshot(uid, symbol)
+telegram_service.py
+send_message(chat_id, text)
+send_order_notification(user, order)
+send_error_notification(user, error)
+subscription_service.py
+is_active(uid)
+update_from_stripe_event(event)
+suspend_if_unpaid(uid)
+dca_service.py
+should_run_now(config)
+already_executed_today(uid, symbol)
+execute_user_dca(uid)
+run_cycle()
+15. Règles métier essentielles
+Autorisation d’exécution DCA
+
+Exécuter seulement si :
+
+user actif
+abonnement actif
+binance connecté
+config DCA activée
+heure OK
+pas déjà exécuté aujourd’hui
+Suspension automatique
+
+Suspendre les achats si :
+
+abonnement non actif
+secret Binance absent
+validation permissions échoue
+erreur répétée Binance
+Restrictions MVP
+une seule config DCA par utilisateur
+une seule paire au début
+uniquement achat spot
+uniquement EUR quote assets en whitelist
+16. Sécurité minimale obligatoire
+Côté utilisateur
+API Binance sans retrait
+spot trading only
+mot de passe Firebase fort
+Côté backend
+vérifier signature webhook Stripe
+jamais logger les secrets
+jamais renvoyer secrets au frontend
+valider tous les inputs
+journal d’audit minimal
+rate limiting simple sur endpoints sensibles
+séparation des rôles service/backend/dashboard
+Côté infra
+HTTPS
+variables d’environnement sécurisées
+compte de service dédié pour Secret Manager
+accès IAM minimal
+Secret Manager est justement conçu pour ce type de contrôle d’accès et stockage sécurisé des credentials.
+17. Variables d’environnement
+Backend
+APP_ENV=development
+APP_BASE_URL=http://localhost:8000
+FIREBASE_PROJECT_ID=xxx
+GOOGLE_APPLICATION_CREDENTIALS=/path/service-account.json
+
+STRIPE_SECRET_KEY=sk_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_ID=price_xxx
+
+TELEGRAM_BOT_TOKEN=xxx
+
+BINANCE_BASE_URL=https://api.binance.com
+
+DEFAULT_TIMEZONE=Europe/Paris
+ALLOWED_SYMBOLS=BTCEUR,ETHEUR,BNBEUR,ADAEUR,SOLEUR
+Dashboard
+API_BASE_URL=http://localhost:8000
+FIREBASE_API_KEY=xxx
+FIREBASE_AUTH_DOMAIN=xxx
+FIREBASE_PROJECT_ID=xxx
+18. Roadmap MVP en 7 étapes
+Étape 1
+
+Initialiser projet backend + dashboard + Firebase + Firestore.
+
+Étape 2
+
+Implémenter auth Firebase + récupération du uid.
+
+Étape 3
+
+Implémenter abonnement Stripe :
+
+checkout
+webhook
+statut en Firestore
+Étape 4
+
+Implémenter connexion Binance :
+
+test credentials
+Secret Manager
+stockage secret_ref
+Étape 5
+
+Implémenter config DCA :
+
+lecture/écriture config
+validation whitelist symboles
+Étape 6
+
+Implémenter scheduler :
+
+run cycle
+ordre market buy
+sauvegarde ordre
+snapshot
+Étape 7
+
+Implémenter Telegram + dashboard complet.
+
+19. Ordre de dev que je recommande à Copilot
+1. Crée le squelette FastAPI propre
+2. Ajoute Firestore service
+3. Ajoute Firebase auth middleware
+4. Ajoute endpoints /me et /health
+5. Ajoute Stripe checkout + webhook
+6. Ajoute modèle subscription
+7. Ajoute Secret Manager service
+8. Ajoute connexion Binance
+9. Ajoute modèle DCA config
+10. Ajoute scheduler DCA
+11. Ajoute portfolio snapshot
+12. Ajoute notifications Telegram
+13. Ajoute dashboard Streamlit
+14. Ajoute Firestore security rules
+15. Ajoute logs + gestion d’erreurs + tests
+20. Ce que Copilot doit éviter
+- Ne pas stocker les secrets Binance dans Firestore en clair
+- Ne pas exécuter d’ordres si subscription_status != active
+- Ne pas laisser le frontend appeler Binance directement
+- Ne pas exposer les secrets ou les clés Stripe dans le client
+- Ne pas utiliser de variables globales partagées entre utilisateurs
+- Ne pas faire un système mono-user bricolé
+- Ne pas hardcoder les symboles ailleurs que dans une constante centralisée
+21. Prompt final ultra-opérationnel pour Copilot
+Construit un MVP SaaS multi-utilisateur en Python avec FastAPI + Firebase Auth + Firestore + Google Secret Manager + Stripe + Streamlit.
+
+Le produit automatise du DCA crypto sur Binance pour des utilisateurs abonnés.
+Chaque utilisateur possède :
+- un compte Firebase
+- un abonnement Stripe
+- une connexion Binance stockée dans Secret Manager
+- une configuration DCA unique
+- des notifications Telegram optionnelles
+- un dashboard personnel
+
+Fonctionnalités :
+- Auth Firebase
+- Checkout Stripe + webhook
+- Firestore comme base métier
+- Secret Manager pour clés Binance
+- API FastAPI proprement structurée
+- Streamlit multipage pour dashboard
+- Scheduler DCA quotidien
+- Passage d’ordres market buy Binance
+- Historique ordres + snapshots
+- Notifications Telegram
+- Firestore security rules
+
+Contraintes :
+- aucune gestion de fonds utilisateur
+- pas de retrait Binance
+- un utilisateur ne voit que ses données
+- symboles autorisés : BTCEUR, ETHEUR, BNBEUR, ADAEUR, SOLEUR
+- timezone Europe/Paris
+- code modulaire, typé, documenté, prêt MVP
+- inclure structure de projet, modèles, services, endpoints, et code initial

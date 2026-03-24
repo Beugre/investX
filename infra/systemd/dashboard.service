@@ -1,0 +1,26 @@
+[Unit]
+Description=InvestX Dashboard (Streamlit)
+After=network.target investx-backend.service
+Requires=investx-backend.service
+
+[Service]
+Type=simple
+User=investx
+Group=investx
+WorkingDirectory=/opt/investx/dashboard
+ExecStart=/opt/investx/venv/bin/streamlit run streamlit_app.py \
+    --server.port 8601 \
+    --server.headless true \
+    --server.address 127.0.0.1 \
+    --browser.gatherUsageStats false
+Restart=always
+RestartSec=5
+
+# Sécurité
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/investx
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

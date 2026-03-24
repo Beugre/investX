@@ -1,0 +1,23 @@
+[Unit]
+Description=InvestX Backend (FastAPI + DCA Scheduler)
+After=network.target
+Wants=investx-dashboard.service
+
+[Service]
+Type=simple
+User=investx
+Group=investx
+WorkingDirectory=/opt/investx/backend
+ExecStart=/opt/investx/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8600 --workers 1
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/investx/backend/.env
+
+# Sécurité
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/investx
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

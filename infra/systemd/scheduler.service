@@ -1,0 +1,3 @@
+# NOTE : Le scheduler DCA est intégré directement dans le backend FastAPI
+# via APScheduler (démarré au startup de l'app). Ce fichier n'est plus nécessaire.
+# Le service investx-backend.service fait tourner à la fois l'API et le scheduler.
