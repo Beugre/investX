@@ -38,10 +38,11 @@ def get_permissions(api_key: str, api_secret: str) -> dict[str, bool]:
     try:
         client = _get_client(api_key, api_secret)
         info = client.get_account_api_permissions()
+        logger.info("Binance API permissions response keys: %s", list(info.keys()))
         return {
-            "can_trade": info.get("canTrade", False),
-            "can_withdraw": info.get("canWithdraw", False),
-            "can_deposit": info.get("canDeposit", False),
+            "can_trade": info.get("enableSpotAndMarginTrading", info.get("canTrade", False)),
+            "can_withdraw": info.get("enableWithdrawals", info.get("canWithdraw", False)),
+            "can_deposit": info.get("enableDeposit", info.get("canDeposit", False)),
         }
     except Exception as e:
         logger.error("Failed to get Binance permissions: %s", e)
@@ -55,7 +56,9 @@ def check_no_withdraw_permission(api_key: str, api_secret: str) -> bool:
     try:
         client = _get_client(api_key, api_secret)
         info = client.get_account_api_permissions()
-        can_withdraw = info.get("canWithdraw", True)
+        logger.info("Binance withdraw check – response: %s", {k: v for k, v in info.items() if 'withdraw' in k.lower() or 'Withdraw' in k})
+        # Binance API uses 'enableWithdrawals' (not 'canWithdraw')
+        can_withdraw = info.get("enableWithdrawals", info.get("canWithdraw", False))
         if can_withdraw:
             logger.warning("Binance API key has withdrawal permission – refusing")
             return False
