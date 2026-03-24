@@ -88,6 +88,12 @@ if mode == "simple (v1)":
                 value=current.get("execution_minute", 0) if current else 0,
             )
 
+        force_rebuy = st.checkbox(
+            "🔄 Forcer réachat aujourd'hui",
+            value=current.get("force_rebuy", False) if current else False,
+            help="Si un ordre a déjà été exécuté aujourd'hui, cochez cette case pour forcer un nouvel achat à la prochaine heure planifiée. Se désactive automatiquement après exécution.",
+        )
+
         submitted = st.form_submit_button("💾 Sauvegarder")
 
     if submitted:
@@ -99,6 +105,7 @@ if mode == "simple (v1)":
             "execution_minute": minute,
             "timezone": "Europe/Paris",
             "mode": "simple",
+            "force_rebuy": force_rebuy,
         }
         try:
             update_dca_config(token, payload)

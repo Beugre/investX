@@ -41,6 +41,7 @@ class DCAConfigRead(BaseModel):
     execution_minute: int = 0
     timezone: str = "Europe/Paris"
     mode: str = "simple"
+    force_rebuy: bool = False
 
 
 class DCAConfigUpdate(BaseModel):
@@ -51,6 +52,7 @@ class DCAConfigUpdate(BaseModel):
     execution_minute: int = Field(ge=0, le=59)
     timezone: str = "Europe/Paris"
     mode: Literal["simple", "rsi_v2"] = "simple"
+    force_rebuy: bool = False
 
     @field_validator("symbol")
     @classmethod

@@ -130,9 +130,17 @@ def execute_user_dca(uid: str) -> dict | None:
         return None
 
     # 4. Vérifier déjà exécuté aujourd'hui
+    force_rebuy = config.get("force_rebuy", False)
     if already_executed_today(uid, symbol):
-        logger.info("Skipping DCA for user %s: already executed today for %s", uid, symbol)
-        return None
+        if not force_rebuy:
+            logger.info("Skipping DCA for user %s: already executed today for %s", uid, symbol)
+            _send_skip_telegram(
+                uid,
+                f"ℹ️ Achat DCA déjà exécuté aujourd'hui pour {symbol}.\n"
+                f"Cochez \"Forcer réachat\" dans le dashboard pour bypasser.",
+            )
+            return None
+        logger.info("Force rebuy activated for user %s / %s", uid, symbol)
 
     # 5. Vérifier Binance connecté
     binance_account = firestore_service.get_binance_account(uid)
@@ -185,6 +193,11 @@ def execute_user_dca(uid: str) -> dict | None:
 
     # 9. Audit
     audit_service.log_dca_executed(uid, symbol, daily_amount)
+
+    # 9b. Reset force_rebuy si activé
+    if force_rebuy:
+        firestore_service.update_dca_config(uid, {"force_rebuy": False})
+        logger.info("force_rebuy reset to False for user %s", uid)
 
     # 10. Refresh snapshot
     try:
@@ -793,6 +806,32 @@ def _send_order_telegram(uid: str, order: dict) -> None:
         loop.close()
     except Exception as e:
         logger.warning("Failed to send Telegram order notification: %s", e)
+
+
+def _send_skip_telegram(uid: str, message: str) -> None:
+    """Envoie un message Telegram quand le DCA est skip (fire-and-forget, une seule fois par jour)."""
+    telegram_settings = firestore_service.get_telegram_settings(uid)
+    if not telegram_settings:
+        return
+    if not telegram_settings.get("enabled"):
+        return
+    chat_id = telegram_settings.get("chat_id")
+    if not chat_id:
+        return
+
+    # Vérifier si on a déjà envoyé ce message aujourd'hui
+    config = firestore_service.get_dca_config(uid)
+    today_str = datetime.now(pytz.timezone("Europe/Paris")).strftime("%Y-%m-%d")
+    if config and config.get("_skip_notified_date") == today_str:
+        return  # Déjà notifié aujourd'hui, pas de spam
+    firestore_service.update_dca_config(uid, {"_skip_notified_date": today_str})
+
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(telegram_service.send_message(chat_id, message))
+        loop.close()
+    except Exception as e:
+        logger.warning("Failed to send Telegram skip notification: %s", e)
 
 
 def _send_error_telegram(uid: str, error_message: str) -> None:
