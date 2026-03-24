@@ -7,8 +7,9 @@ from __future__ import annotations
 from typing import Any
 
 import requests
+import streamlit as st
 
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = st.secrets.get("API_BASE_URL", "http://localhost:8000")
 
 
 def _headers(token: str) -> dict[str, str]:
