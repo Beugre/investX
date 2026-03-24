@@ -40,8 +40,8 @@ def _get_fernet() -> Fernet:
 
 def _get_firestore_db():
     """Récupère le client Firestore."""
-    from app.services.firestore_service import _get_db
-    return _get_db()
+    from app.services.firestore_service import _db
+    return _db()
 
 
 def create_or_update_binance_secret(uid: str, api_key: str, api_secret: str) -> str:
