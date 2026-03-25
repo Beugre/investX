@@ -70,3 +70,46 @@ async def send_subscription_notification(chat_id: str, status: str) -> bool:
     emoji = "✅" if status == "active" else "⚠️"
     text = f"{emoji} <b>Abonnement</b>\n\nStatut : {status}"
     return await send_message(chat_id, text)
+
+
+# ── Versions synchrones (safe depuis scheduler threads & uvicorn) ──
+
+def send_message_sync(chat_id: str, text: str) -> bool:
+    """Envoie un message Telegram (version sync)."""
+    try:
+        response = httpx.post(
+            f"{TELEGRAM_API}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            logger.info("Telegram message sent to %s", chat_id)
+            return True
+        logger.warning("Telegram API error %s: %s", response.status_code, response.text)
+        return False
+    except Exception as e:
+        logger.error("Failed to send Telegram message (sync): %s", e)
+        return False
+
+
+def send_order_notification_sync(chat_id: str, order: dict) -> bool:
+    """Envoie une notification d'achat DCA réussi (sync)."""
+    symbol = order.get('symbol', '?')
+    cs = "€" if symbol.endswith("-EUR") else "$"
+    est_tag = "\n⚠️ <i>Données estimées (fills indisponibles)</i>" if order.get("estimated") else ""
+    text = (
+        "✅ <b>Achat DCA exécuté</b>\n\n"
+        f"Paire : {symbol}\n"
+        f"Montant : {order.get('amount_eur', 0):.2f} {cs}\n"
+        f"Quantité : {order.get('quantity', 0):.8f}\n"
+        f"Prix : {order.get('price', 0):,.2f} {cs}\n"
+        f"Statut : {order.get('status', '?')}"
+        f"{est_tag}"
+    )
+    return send_message_sync(chat_id, text)
+
+
+def send_error_notification_sync(chat_id: str, error_message: str) -> bool:
+    """Envoie une notification d'erreur (sync)."""
+    text = f"❌ <b>Erreur DCA</b>\n\n{error_message}"
+    return send_message_sync(chat_id, text)

@@ -111,9 +111,13 @@ async def force_execute_dca_v2(uid: str = Depends(get_current_uid)):
     if not config or not config.get("enabled"):
         return {"message": "DCA v2 not enabled", "executed": False}
     result = dca_service._execute_user_dca_v2(uid, config, force_now=True)
+    if result and isinstance(result, dict) and result.get("_no_orders"):
+        errors = result.get("errors", [])
+        msg = "Ordres échoués : " + " | ".join(errors) if errors else "Aucun ordre passé"
+        return {"message": msg, "executed": False, "errors": errors}
     if result:
         return {"message": "DCA v2 executed", "executed": True, "orders": result if isinstance(result, list) else [result]}
-    return {"message": "DCA v2 executed but no orders (RSI overbought or caps reached)", "executed": False}
+    return {"message": "Aucun ordre : RSI overbought ou caps atteints", "executed": False}
 
 
 @router.get("/v2/status")

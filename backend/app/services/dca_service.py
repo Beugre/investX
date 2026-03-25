@@ -7,7 +7,6 @@ Supporte :
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -557,11 +556,13 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
 
     # ── 10. Passage des ordres ───────────────────────
     orders_executed: list[dict] = []
+    order_errors: list[str] = []
 
     # Ordre BTC DCA normal
     if btc_amount > 0:
         btc_order = _place_order_safe(
-            uid, creds, btc_symbol, btc_amount, ORDER_SOURCE_SCHEDULER, exchange
+            uid, creds, btc_symbol, btc_amount, ORDER_SOURCE_SCHEDULER, exchange,
+            errors_out=order_errors,
         )
         if btc_order:
             orders_executed.append(btc_order)
@@ -569,7 +570,8 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
     # Ordre ETH DCA normal
     if eth_amount > 0:
         eth_order = _place_order_safe(
-            uid, creds, eth_symbol, eth_amount, ORDER_SOURCE_SCHEDULER, exchange
+            uid, creds, eth_symbol, eth_amount, ORDER_SOURCE_SCHEDULER, exchange,
+            errors_out=order_errors,
         )
         if eth_order:
             orders_executed.append(eth_order)
@@ -577,7 +579,8 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
     # Ordres crash reserve (tout en BTC)
     if crash_amount > 0:
         crash_order = _place_order_safe(
-            uid, creds, btc_symbol, crash_amount, ORDER_SOURCE_CRASH, exchange
+            uid, creds, btc_symbol, crash_amount, ORDER_SOURCE_CRASH, exchange,
+            errors_out=order_errors,
         )
         if crash_order:
             orders_executed.append(crash_order)
@@ -600,6 +603,8 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
 
     if not orders_executed:
         logger.warning("DCA v2 user %s: no orders executed", uid)
+        if order_errors:
+            return {"_no_orders": True, "errors": order_errors}
         return None
 
     # ── 11. Enregistrement spending ──────────────────
@@ -665,7 +670,7 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
 
 def _place_order_safe(
     uid: str, creds: dict, symbol: str, amount: float, source: str,
-    exchange: str = "binance",
+    exchange: str = "binance", *, errors_out: list[str] | None = None,
 ) -> dict | None:
     """Place un ordre et enregistre. Retourne None en cas d'échec."""
     try:
@@ -678,6 +683,8 @@ def _place_order_safe(
     except (BinanceError, ExchangeError) as e:
         logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
+        if errors_out is not None:
+            errors_out.append(f"{symbol}: {e.message}")
         err_upper = str(e.message).upper()
         if "NOTIONAL" in err_upper:
             user_msg = (
@@ -796,9 +803,7 @@ def _send_v2_telegram(
     message = "\n".join(lines)
 
     try:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(telegram_service.send_message(chat_id, message))
-        loop.close()
+        telegram_service.send_message_sync(chat_id, message)
     except Exception as e:
         logger.warning("Failed to send DCA v2 Telegram notification: %s", e)
 
@@ -929,11 +934,7 @@ def _send_order_telegram(uid: str, order: dict) -> None:
     if not chat_id:
         return
     try:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(
-            telegram_service.send_order_notification(chat_id, order)
-        )
-        loop.close()
+        telegram_service.send_order_notification_sync(chat_id, order)
     except Exception as e:
         logger.warning("Failed to send Telegram order notification: %s", e)
 
@@ -957,9 +958,7 @@ def _send_skip_telegram(uid: str, message: str) -> None:
     firestore_service.update_dca_config(uid, {"_skip_notified_date": today_str})
 
     try:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(telegram_service.send_message(chat_id, message))
-        loop.close()
+        telegram_service.send_message_sync(chat_id, message)
     except Exception as e:
         logger.warning("Failed to send Telegram skip notification: %s", e)
 
@@ -975,11 +974,7 @@ def _send_error_telegram(uid: str, error_message: str) -> None:
     if not chat_id:
         return
     try:
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(
-            telegram_service.send_error_notification(chat_id, error_message)
-        )
-        loop.close()
+        telegram_service.send_error_notification_sync(chat_id, error_message)
     except Exception as e:
         logger.warning("Failed to send Telegram error notification: %s", e)
 
