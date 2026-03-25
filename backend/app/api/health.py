@@ -26,7 +26,7 @@ async def health_check():
     # Check Firestore
     try:
         from app.services import firestore_service
-        firestore_service.get_user("__health_check__")
+        firestore_service.get_user("health_check_probe")
         checks["firestore"] = "ok"
     except Exception as e:
         checks["firestore"] = f"error: {e}"
