@@ -11,7 +11,7 @@ from app.core.auth_firebase import get_current_uid
 from app.core.exceptions import NotFound
 from pydantic import BaseModel
 from app.schemas.user import UserProfile, OnboardingResponse
-from app.services import firestore_service
+from app.services import firestore_service, email_service
 
 router = APIRouter(tags=["Users"])
 
@@ -49,6 +49,12 @@ async def init_onboarding(uid: str = Depends(get_current_uid)):
             "timezone": "Europe/Paris",
         },
     )
+    # Email de bienvenue (fire-and-forget)
+    try:
+        email_service.send_welcome_email(email, display_name)
+    except Exception:
+        pass  # Ne pas bloquer l'onboarding en cas d'échec email
+
     return OnboardingResponse(uid=uid, message="User initialized")
 
 

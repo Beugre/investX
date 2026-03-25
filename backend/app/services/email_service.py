@@ -356,3 +356,80 @@ def send_error_email(to: str, error_message: str) -> bool:
 """
 
     return _send_email(to, subject, html, plain)
+
+
+def send_welcome_email(to: str, display_name: str = "") -> bool:
+    """Envoie un email de bienvenue à un nouvel utilisateur."""
+    name = display_name or "investisseur"
+    subject = "Bienvenue sur InvestX !"
+
+    plain = (
+        f"InvestX\n\n"
+        f"Bienvenue {name} !\n\n"
+        f"Votre compte InvestX a été créé avec succès.\n\n"
+        f"Avec InvestX, automatisez vos investissements crypto grâce au DCA\n"
+        f"(Dollar Cost Averaging) intelligent piloté par RSI.\n\n"
+        f"Prochaines étapes :\n"
+        f"1. Connectez vos clés API Binance\n"
+        f"2. Configurez votre stratégie DCA\n"
+        f"3. Activez le bot et laissez-le travailler !\n\n"
+        f"Accéder au dashboard : https://investxbot.com/Dashboard\n\n"
+        f"À bientôt,\nL'équipe InvestX"
+    )
+
+    html = f"""
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+  <!-- Header -->
+  <tr><td style="padding:32px 40px 0;text-align:center;">
+    <p style="margin:0;font-size:16px;font-weight:600;color:#1a1a2e;letter-spacing:1px;">InvestX</p>
+  </td></tr>
+
+  <!-- Title -->
+  <tr><td style="padding:24px 40px 0;text-align:center;">
+    <h1 style="margin:0;font-size:28px;font-weight:800;color:#1a1a2e;line-height:1.3;">Bienvenue {name} !</h1>
+  </td></tr>
+
+  <!-- Subtitle -->
+  <tr><td style="padding:16px 40px 0;text-align:center;">
+    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
+      Votre compte InvestX a été créé avec succès.<br>
+      Automatisez vos investissements crypto grâce au DCA intelligent piloté par RSI.
+    </p>
+  </td></tr>
+
+  <!-- Steps -->
+  <tr><td style="padding:28px 40px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Étape 1</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">Connectez vos clés API Binance</td>
+      </tr>
+      <tr>
+        <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Étape 2</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">Configurez votre stratégie DCA</td>
+      </tr>
+      <tr>
+        <td style="padding:14px 16px;font-size:14px;color:#888;">Étape 3</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;">Activez le bot et laissez-le travailler !</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA Button -->
+  <tr><td style="padding:0 40px 36px;text-align:center;">
+    <a href="https://investxbot.com/Dashboard" style="display:inline-block;padding:14px 32px;background-color:#1a73e8;color:#ffffff;text-decoration:none;border-radius:24px;font-size:15px;font-weight:600;">Accéder au Dashboard</a>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>
+"""
+
+    return _send_email(to, subject, html, plain)
