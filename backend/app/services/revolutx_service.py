@@ -327,7 +327,8 @@ def _get_best_bid(symbol: str) -> float:
         if bids:
             if isinstance(bids[0], list):
                 return float(bids[0][0])
-            return float(bids[0].get("price", 0))
+            # Revolut X utilise "p" comme clé prix dans l'order-book
+            return float(bids[0].get("p", bids[0].get("price", 0)))
         return 0.0
     except Exception as e:
         logger.warning("Failed to get best bid for %s: %s", symbol, e)
@@ -380,7 +381,7 @@ def _build_order_result(
 
     # Niveau 1 : champs directs
     total_qty = _extract_float(order_data, "filled_size", "filled_quantity", "executed_quantity", "base_size")
-    avg_price = _extract_float(order_data, "average_filled_price", "avg_price", "average_price", "price")
+    avg_price = _extract_float(order_data, "average_fill_price", "average_filled_price", "avg_price", "average_price", "price")
     total_cost = _extract_float(order_data, "filled_value", "total_value", "cost", "quote_size")
     total_commission = _extract_float(order_data, "fee", "commission", "total_fee")
 
@@ -545,11 +546,11 @@ def get_symbol_price_no_auth(symbol: str) -> float:
         bids = data.get("data", {}).get("bids", [])
 
         if asks and bids:
-            best_ask = float(asks[0][0]) if isinstance(asks[0], list) else float(asks[0].get("price", 0))
-            best_bid = float(bids[0][0]) if isinstance(bids[0], list) else float(bids[0].get("price", 0))
+            best_ask = float(asks[0][0]) if isinstance(asks[0], list) else float(asks[0].get("p", asks[0].get("price", 0)))
+            best_bid = float(bids[0][0]) if isinstance(bids[0], list) else float(bids[0].get("p", bids[0].get("price", 0)))
             return (best_ask + best_bid) / 2
         elif asks:
-            return float(asks[0][0]) if isinstance(asks[0], list) else float(asks[0].get("price", 0))
+            return float(asks[0][0]) if isinstance(asks[0], list) else float(asks[0].get("p", asks[0].get("price", 0)))
 
         raise ExchangeError(f"No price data for {symbol}")
     except ExchangeError:
