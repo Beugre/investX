@@ -229,16 +229,46 @@ def place_market_buy_order(
         else:
             net_qty = total_qty
 
-        # Sécurité finale : si aucun fill n'a été trouvé, l'ordre n'a pas vraiment été exécuté
+        # Si state=FILLED/DONE mais 0 fills : l'ordre A été exécuté côté Revolut
+        # (l'argent est parti), mais l'API fills n'a pas renvoyé les détails.
+        # On retourne un succès avec des données estimées plutôt qu'une erreur.
         if total_qty == 0:
-            logger.warning(
-                "Revolut X order %s state=%s but 0 fills – treating as failed",
-                venue_order_id, state,
-            )
-            raise ExchangeError(
-                f"Revolut X : ordre non exécuté (état: {state.lower()}, aucun fill reçu). "
-                f"Vérifiez votre solde Cryptos · EUR."
-            )
+            _SUCCESS_STATES = {"FILLED", "DONE", "COMPLETED"}
+            if state in _SUCCESS_STATES:
+                logger.warning(
+                    "Revolut X order %s state=%s but 0 fills – returning estimated data",
+                    venue_order_id, state,
+                )
+                # Essayer de récupérer le prix courant pour estimer la quantité
+                try:
+                    est_price = get_symbol_price_no_auth(symbol)
+                    est_qty = quote_amount / est_price if est_price > 0 else 0.0
+                except Exception:
+                    est_price = 0.0
+                    est_qty = 0.0
+
+                return {
+                    "symbol": symbol,
+                    "side": "BUY",
+                    "amount_eur": quote_amount,
+                    "quantity": est_qty,
+                    "quantity_gross": est_qty,
+                    "commission": 0.0,
+                    "commission_asset": "",
+                    "price": est_price,
+                    "status": state,
+                    "exchange_order_id": venue_order_id,
+                    "estimated": True,
+                }
+            else:
+                logger.warning(
+                    "Revolut X order %s state=%s and 0 fills – treating as failed",
+                    venue_order_id, state,
+                )
+                raise ExchangeError(
+                    f"Revolut X : ordre {state.lower()}, aucun fill reçu. "
+                    f"Vérifiez votre solde Cryptos · EUR."
+                )
 
         logger.info(
             "Revolut X market buy: symbol=%s, quote=%.2f, qty=%.8f, avg_price=%.2f",
@@ -265,11 +295,14 @@ def place_market_buy_order(
 
 
 def _get_order_fills(
-    api_key: str, private_key_pem: str, venue_order_id: str
+    api_key: str, private_key_pem: str, venue_order_id: str,
+    max_retries: int = 5, delay: float = 1.0,
 ) -> list[dict]:
-    """Récupère les fills d'un ordre. Retry jusqu'à 3 fois car le fill peut prendre un instant."""
+    """Récupère les fills d'un ordre.
+    Retry jusqu'à max_retries fois car le fill peut mettre quelques secondes.
+    """
     import time as _time
-    for attempt in range(3):
+    for attempt in range(max_retries):
         try:
             result = _request(
                 api_key, private_key_pem, "GET",
@@ -278,11 +311,15 @@ def _get_order_fills(
             fills = result.get("data", [])
             if fills:
                 return fills
-            _time.sleep(0.5)  # Attendre un peu pour le fill
+            logger.debug(
+                "Fills attempt %d/%d for %s: empty, retrying...",
+                attempt + 1, max_retries, venue_order_id,
+            )
+            _time.sleep(delay)
         except ExchangeError:
-            if attempt == 2:
+            if attempt == max_retries - 1:
                 raise
-            _time.sleep(0.5)
+            _time.sleep(delay)
     return []
 
 

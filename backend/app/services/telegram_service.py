@@ -44,13 +44,17 @@ async def send_message(chat_id: str, text: str) -> bool:
 
 async def send_order_notification(chat_id: str, order: dict) -> bool:
     """Envoie une notification d'achat DCA réussi."""
+    symbol = order.get('symbol', '?')
+    cs = "€" if symbol.endswith("-EUR") else "$"
+    est_tag = "\n⚠️ <i>Données estimées (fills indisponibles)</i>" if order.get("estimated") else ""
     text = (
         "✅ <b>Achat DCA exécuté</b>\n\n"
-        f"Paire : {order.get('symbol', '?')}\n"
-        f"Montant : {order.get('amount_eur', 0):.2f} €\n"
+        f"Paire : {symbol}\n"
+        f"Montant : {order.get('amount_eur', 0):.2f} {cs}\n"
         f"Quantité : {order.get('quantity', 0):.8f}\n"
-        f"Prix : {order.get('price', 0):,.2f} €\n"
+        f"Prix : {order.get('price', 0):,.2f} {cs}\n"
         f"Statut : {order.get('status', '?')}"
+        f"{est_tag}"
     )
     return await send_message(chat_id, text)
 

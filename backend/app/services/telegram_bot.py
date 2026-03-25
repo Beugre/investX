@@ -111,12 +111,27 @@ async def _poll_updates() -> None:
     logger.info("Telegram bot polling stopped")
 
 
+async def _delete_webhook() -> None:
+    """Supprime tout webhook existant pour éviter le conflit 409 avec getUpdates."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(f"{TELEGRAM_API}/deleteWebhook")
+            if resp.status_code == 200:
+                logger.info("Telegram webhook deleted (switch to polling)")
+            else:
+                logger.warning("deleteWebhook returned %s", resp.status_code)
+    except Exception as e:
+        logger.warning("Failed to delete webhook: %s", e)
+
+
 def start_bot() -> None:
     """Démarre le polling Telegram dans une tâche asyncio."""
     global _polling_task
     _should_stop.clear()
 
     loop = asyncio.get_event_loop()
+    # Supprimer le webhook avant de commencer le polling
+    loop.create_task(_delete_webhook())
     _polling_task = loop.create_task(_poll_updates())
     logger.info("Telegram bot polling task created")
 

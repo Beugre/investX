@@ -742,18 +742,29 @@ def _send_v2_telegram(
     if not chat_id:
         return
 
+    # Déterminer le symbole monétaire
+    cs = "€" if any(o.get("symbol", "").endswith("-EUR") for o in orders) else "$"
+
     total = btc_amount + eth_amount + crash_amount
     lines = [
-        "📊 *DCA RSI v2 exécuté*",
-        f"RSI: `{rsi:.1f}` ({rsi_label})",
-        f"Régime: `{regime}`",
-        f"BTC: `{btc_amount:.2f}` | ETH: `{eth_amount:.2f}`",
+        "📊 <b>DCA RSI v2 exécuté</b>",
+        f"RSI : <code>{rsi:.1f}</code> ({rsi_label})",
+        f"Régime : <code>{regime}</code>",
+        f"BTC : <code>{btc_amount:.2f} {cs}</code> | ETH : <code>{eth_amount:.2f} {cs}</code>",
     ]
     if crash_amount > 0:
         lines.append(
-            f"🚨 Crash reserve: `{crash_amount:.2f}` ({', '.join(crash_levels)})"
+            f"🚨 Crash reserve : <code>{crash_amount:.2f} {cs}</code> ({', '.join(crash_levels)})"
         )
-    lines.append(f"*Total: {total:.2f}*")
+    lines.append(f"<b>Total : {total:.2f} {cs}</b>")
+
+    # Détails par ordre
+    for o in orders:
+        sym = o.get('symbol', '?')
+        qty = o.get('quantity', 0)
+        price = o.get('price', 0)
+        est = " (estimé)" if o.get('estimated') else ""
+        lines.append(f"  • {sym} : {qty:.8f} @ {price:,.2f} {cs}{est}")
 
     message = "\n".join(lines)
 
