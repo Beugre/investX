@@ -315,6 +315,14 @@ def _logged_in_home():
         st.rerun()
 
 
+# ── CSS : masquer la sidebar quand non connecté ──
+_HIDE_SIDEBAR_NAV = """
+<style>
+    [data-testid="stSidebarNav"] { display: none; }
+</style>
+"""
+
+
 # ── Routage ── restauration automatique de session
 status = try_restore_session()
 if status == "loading":
@@ -323,4 +331,5 @@ if status == "loading":
 elif status == "restored":
     _logged_in_home()
 else:
+    st.markdown(_HIDE_SIDEBAR_NAV, unsafe_allow_html=True)
     _landing_page()
