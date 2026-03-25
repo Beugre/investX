@@ -90,8 +90,9 @@ with st.expander("4️⃣  Créer une clé API Binance", expanded=False):
 - ✅ **Enable Spot & Margin Trading** – **à activer manuellement**
 - ❌ **Enable Withdrawals** – **NE PAS activer** (InvestX n'a pas besoin de retirer vos fonds)
 
-**🔒 Restriction IP (optionnel mais recommandé) :**
+**🔒 Restriction IP (obligatoire) :**
 - Dans les paramètres de l'API, restreignez l'accès à l'IP du serveur InvestX : `213.199.41.168`
+- ⚠️ **Sans cette restriction IP, Binance ne permet pas d'activer le Spot & Margin Trading.**
 
 5. Copiez la **API Key** et la **Secret Key** – vous en aurez besoin à l'étape 6.
 

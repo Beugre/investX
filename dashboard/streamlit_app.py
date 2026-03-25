@@ -17,7 +17,7 @@ from services.api_client import (
 from services.session_manager import try_restore_session, save_session, clear_session
 
 st.set_page_config(
-    page_title="InvestX – DCA Crypto Automatisé",
+    page_title="Accueil – InvestX",
     page_icon="📈",
     layout="wide",
 )
@@ -256,14 +256,14 @@ def _logged_in_home():
     st.subheader("🧭 Navigation rapide")
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.page_link("pages/1_Dashboard.py", label="📊 Dashboard", icon="📊")
-        st.page_link("pages/2_DCA_Config.py", label="⚙️ Config DCA", icon="⚙️")
+        st.page_link("pages/1_Dashboard.py", label="📊 Dashboard")
+        st.page_link("pages/2_DCA_Config.py", label="⚙️ Config DCA")
     with c2:
-        st.page_link("pages/3_Subscription.py", label="💳 Abonnement", icon="💳")
-        st.page_link("pages/4_Integrations.py", label="🔗 Intégrations", icon="🔗")
+        st.page_link("pages/3_Subscription.py", label="💳 Abonnement")
+        st.page_link("pages/4_Integrations.py", label="🔗 Intégrations")
     with c3:
-        st.page_link("pages/5_History.py", label="📜 Historique", icon="📜")
-        st.page_link("pages/7_Guide.py", label="📖 Guide démarrage", icon="📖")
+        st.page_link("pages/5_History.py", label="📜 Historique")
+        st.page_link("pages/7_Guide.py", label="📖 Guide démarrage")
 
     st.divider()
 
