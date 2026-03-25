@@ -311,7 +311,7 @@ def execute_user_dca(uid: str) -> dict | None:
 # v2 – DCA RSI avancé : moteur complet
 # ══════════════════════════════════════════════════════
 
-def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
+def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> dict | None:
     """Pipeline complet de la stratégie DCA RSI v2.
 
     1. Heure d'exécution
@@ -328,7 +328,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     12. Notification Telegram
     """
     # ── 1. Heure d'exécution ─────────────────────────
-    if not should_run_now(config):
+    if not force_now and not should_run_now(config):
         return None
 
     # ── 2. Exchange connecté + credentials ────────────
@@ -350,7 +350,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     base_amount = config.get("base_daily_amount", 12.0)
 
     # Anti-doublon : si un ordre BTC a été passé il y a < 2 min, skip
-    if _recently_executed(uid, btc_symbol):
+    if not force_now and _recently_executed(uid, btc_symbol):
         logger.info("Skipping DCA v2 for user %s: order too recent (anti-doublon)", uid)
         return None
 

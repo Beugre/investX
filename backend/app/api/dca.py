@@ -104,6 +104,18 @@ async def disable_dca_v2(uid: str = Depends(get_current_uid)):
     return {"message": "DCA RSI v2 disabled"}
 
 
+@router.post("/v2/force-execute")
+async def force_execute_dca_v2(uid: str = Depends(get_current_uid)):
+    """Force l'exécution immédiate du DCA v2 (ignore l'heure programmée)."""
+    config = firestore_service.get_dca_v2_config(uid)
+    if not config or not config.get("enabled"):
+        return {"message": "DCA v2 not enabled", "executed": False}
+    result = dca_service._execute_user_dca_v2(uid, config, force_now=True)
+    if result:
+        return {"message": "DCA v2 executed", "executed": True, "orders": result if isinstance(result, list) else [result]}
+    return {"message": "DCA v2 executed but no orders (RSI overbought or caps reached)", "executed": False}
+
+
 @router.get("/v2/status")
 async def get_dca_v2_status(uid: str = Depends(get_current_uid)):
     """Aperçu en temps réel : indicateurs + montant calculé (sans exécuter).

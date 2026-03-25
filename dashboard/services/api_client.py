@@ -127,6 +127,10 @@ def disable_dca_v2(token: str) -> dict:
     return _post("/dca/v2/disable", token)
 
 
+def force_execute_dca_v2(token: str) -> dict:
+    return _post("/dca/v2/force-execute", token)
+
+
 def get_dca_v2_status(token: str) -> dict:
     return _get("/dca/v2/status", token)
 

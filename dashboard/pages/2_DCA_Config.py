@@ -19,6 +19,7 @@ from services.api_client import (
     update_dca_v2_config,
     enable_dca_v2,
     disable_dca_v2,
+    force_execute_dca_v2,
     get_dca_v2_status,
     get_dca_v2_spending,
     get_dca_v2_crash_reserve,
@@ -483,6 +484,19 @@ if submitted:
 # ────────────────────────────────────────────────────
 st.divider()
 st.markdown("### 📡 État actuel")
+
+# ── Forcer exécution maintenant ──
+if (v2_config or {}).get("enabled"):
+    if st.button("⚡ Forcer exécution maintenant", type="primary", help="Lance un cycle DCA v2 immédiatement, sans attendre l'heure programmée."):
+        with st.spinner("Exécution en cours..."):
+            try:
+                result = force_execute_dca_v2(token)
+                if result.get("executed"):
+                    st.success(f"✅ {result.get('message', 'DCA v2 exécuté !')}")
+                else:
+                    st.warning(f"⚠️ {result.get('message', 'Aucun ordre passé')}")
+            except Exception as e:
+                st.error(f"❌ Erreur : {e}")
 
 # ── Indicateurs en temps réel ──
 with st.expander("📊 Indicateurs en temps réel", expanded=True):
