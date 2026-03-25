@@ -171,7 +171,26 @@ def place_market_buy_order(
         data = result.get("data", result)
 
         venue_order_id = data.get("venue_order_id", client_order_id)
-        state = data.get("state", "PENDING")
+        state = data.get("state", "PENDING").upper()
+        failure_reason = data.get("failure_reason", "") or data.get("reject_reason", "") or ""
+
+        # Vérifier si l'ordre a été rejeté/annulé par l'exchange
+        _FAILED_STATES = {"CANCELLED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"}
+        if state in _FAILED_STATES:
+            detail = failure_reason or state
+            logger.warning(
+                "Revolut X order %s returned state=%s reason=%s",
+                venue_order_id, state, failure_reason,
+            )
+            # Détecter spécifiquement le solde insuffisant
+            reason_upper = detail.upper()
+            if any(kw in reason_upper for kw in ("INSUFFICIENT", "BALANCE", "FUNDS", "NOT_ENOUGH")):
+                raise ExchangeError(
+                    f"Revolut X : solde insuffisant – {detail}"
+                )
+            raise ExchangeError(
+                f"Revolut X : ordre {state.lower()} – {detail}"
+            )
 
         # Récupérer les fills pour le prix moyen et la quantité
         fills_data = _get_order_fills(api_key, private_key_pem, venue_order_id)
@@ -202,6 +221,17 @@ def place_market_buy_order(
             net_qty = total_qty - total_commission
         else:
             net_qty = total_qty
+
+        # Sécurité finale : si aucun fill n'a été trouvé, l'ordre n'a pas vraiment été exécuté
+        if total_qty == 0:
+            logger.warning(
+                "Revolut X order %s state=%s but 0 fills – treating as failed",
+                venue_order_id, state,
+            )
+            raise ExchangeError(
+                f"Revolut X : ordre non exécuté (état: {state.lower()}, aucun fill reçu). "
+                f"Vérifiez votre solde Cryptos · EUR."
+            )
 
         logger.info(
             "Revolut X market buy: symbol=%s, quote=%.2f, qty=%.8f, avg_price=%.2f",
