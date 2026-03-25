@@ -120,3 +120,32 @@ async def get_revolutx_status(uid: str = Depends(get_current_uid)):
     if not account:
         return RevolutXStatusResponse()
     return RevolutXStatusResponse(**account)
+
+
+@router.post("/generate-keys")
+async def generate_ed25519_keys(uid: str = Depends(get_current_uid)):
+    """Génère une paire de clés Ed25519 pour Revolut X.
+    Retourne la clé publique (à coller dans Revolut X) et la clé privée (à garder).
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+
+    private_key = Ed25519PrivateKey.generate()
+
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+
+    logger.info("Ed25519 key pair generated for user %s", uid)
+
+    return {
+        "public_key_pem": public_pem,
+        "private_key_pem": private_pem,
+    }

@@ -190,6 +190,10 @@ def get_revolutx_status(token: str) -> dict:
     return _get("/revolutx/status", token)
 
 
+def generate_revolutx_keys(token: str) -> dict:
+    return _post("/revolutx/generate-keys", token)
+
+
 def connect_revolutx(token: str, api_key: str, private_key_pem: str) -> dict:
     return _post("/revolutx/connect", token, json={
         "api_key": api_key,

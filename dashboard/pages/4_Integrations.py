@@ -11,6 +11,7 @@ from services.api_client import (
     validate_binance,
     disconnect_binance,
     get_revolutx_status,
+    generate_revolutx_keys,
     connect_revolutx,
     validate_revolutx,
     disconnect_revolutx,
@@ -126,33 +127,93 @@ if rx_connected:
                 st.error(f"Erreur : {e}")
 else:
     st.warning("Revolut X non connecté.")
-    st.markdown("""
-    **Instructions :**
-    1. Allez dans votre app Revolut → Hub → Revolut X
-    2. Ouvrez **Paramètres API** et créez une clé API
-    3. Générez une paire de clés **Ed25519** (la clé publique est enregistrée dans Revolut X)
-    4. Collez votre **API Key** et votre **clé privée PEM** ci-dessous
-    """)
 
-    with st.form("revolutx_connect_form"):
-        rx_api_key = st.text_input("API Key Revolut X")
-        rx_private_key = st.text_area(
-            "Clé privée Ed25519 (PEM)",
-            height=150,
-            placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
+    # ── Étape 1 : Générer les clés Ed25519 ──
+    st.markdown("### Étape 1 — Générer vos clés de sécurité")
+    st.markdown(
+        "Revolut X utilise des clés **Ed25519** pour sécuriser l'accès API. "
+        "Cliquez ci-dessous pour générer automatiquement votre paire de clés."
+    )
+
+    if st.button("🔑 Générer mes clés Ed25519", key="rx_gen_keys"):
+        try:
+            keys = generate_revolutx_keys(token)
+            st.session_state["rx_public_key"] = keys["public_key_pem"]
+            st.session_state["rx_private_key"] = keys["private_key_pem"]
+        except Exception as e:
+            st.error(f"Erreur lors de la génération : {e}")
+
+    if st.session_state.get("rx_public_key"):
+        st.success("✅ Clés générées !")
+
+        st.markdown("### Étape 2 — Copiez la clé publique dans Revolut X")
+        st.markdown(
+            "1. Allez dans **Revolut X** → **Paramètres API** → **+ Ajouter**\n"
+            "2. Donnez un nom (ex: `InvestX`)\n"
+            "3. **Copiez la clé publique ci-dessous** et collez-la dans le champ \"Clé publique\"\n"
+            "4. Cochez **Ordre spot** (et \"Voir mes ordres spot\")\n"
+            "5. Cliquez **Enregistrer**"
         )
-        rx_submitted = st.form_submit_button("🔗 Connecter Revolut X")
+        st.code(st.session_state["rx_public_key"], language=None)
 
-        if rx_submitted:
-            if not rx_api_key or not rx_private_key:
-                st.error("Veuillez remplir les deux champs.")
-            else:
-                try:
-                    connect_revolutx(token, rx_api_key, rx_private_key.strip())
-                    st.success("✅ Revolut X connecté !")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Erreur : {e}")
+        st.markdown("### Étape 3 — Entrez l'API Key de Revolut X")
+        st.markdown(
+            "Après avoir enregistré dans Revolut X, copiez la **Clé API** affichée "
+            "(ex: `Syjv***590d`) et collez-la ci-dessous."
+        )
+
+        with st.form("revolutx_connect_form"):
+            rx_api_key = st.text_input("API Key Revolut X")
+            st.text_area(
+                "Clé privée Ed25519 (auto-générée ✅)",
+                value=st.session_state["rx_private_key"],
+                height=100,
+                disabled=True,
+            )
+            rx_submitted = st.form_submit_button("🔗 Connecter Revolut X")
+
+            if rx_submitted:
+                if not rx_api_key:
+                    st.error("Veuillez entrer l'API Key de Revolut X.")
+                else:
+                    try:
+                        connect_revolutx(
+                            token, rx_api_key,
+                            st.session_state["rx_private_key"].strip(),
+                        )
+                        # Nettoyage session
+                        st.session_state.pop("rx_public_key", None)
+                        st.session_state.pop("rx_private_key", None)
+                        st.success("✅ Revolut X connecté !")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur : {e}")
+    else:
+        st.info(
+            "💡 Vous pouvez aussi coller manuellement votre clé privée "
+            "si vous l'avez déjà générée vous-même."
+        )
+        with st.expander("🔧 Connexion manuelle (utilisateurs avancés)"):
+            with st.form("revolutx_manual_form"):
+                rx_api_key_m = st.text_input("API Key Revolut X", key="rx_api_m")
+                rx_private_key_m = st.text_area(
+                    "Clé privée Ed25519 (PEM)",
+                    height=150,
+                    placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
+                    key="rx_pk_m",
+                )
+                rx_submitted_m = st.form_submit_button("🔗 Connecter")
+
+                if rx_submitted_m:
+                    if not rx_api_key_m or not rx_private_key_m:
+                        st.error("Veuillez remplir les deux champs.")
+                    else:
+                        try:
+                            connect_revolutx(token, rx_api_key_m, rx_private_key_m.strip())
+                            st.success("✅ Revolut X connecté !")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Erreur : {e}")
 
 # ═══════════════ INFO EXCHANGE ACTIF ════════════════
 if is_connected and rx_connected:
