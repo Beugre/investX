@@ -16,6 +16,7 @@ from services.api_client import (
     init_onboarding,
     get_subscription_status,
     get_binance_status,
+    get_revolutx_status,
     get_telegram_settings,
     get_dca_config,
     get_user_profile,
@@ -240,6 +241,15 @@ def _logged_in_home():
     except Exception:
         pass
 
+    check_revolutx = False
+    try:
+        rx = get_revolutx_status(token)
+        check_revolutx = rx.get("is_connected", False)
+    except Exception:
+        pass
+
+    check_exchange = check_binance or check_revolutx
+
     check_dca = False
     try:
         dca = get_dca_config(token)
@@ -255,7 +265,7 @@ def _logged_in_home():
         pass
 
     total_steps = 5
-    done = sum([check_account, check_sub, check_binance, check_dca, check_telegram])
+    done = sum([check_account, check_sub, check_exchange, check_dca, check_telegram])
     progress = done / total_steps
 
     st.progress(progress, text=f"{done}/{total_steps} étapes complétées")
@@ -279,10 +289,14 @@ def _logged_in_home():
             st.caption("[→ S'abonner](Subscription)")
 
     with col3:
-        icon = "✅" if check_binance else "⬜"
-        st.markdown(f"**{icon} Binance**")
-        if check_binance:
-            st.caption("Connecté")
+        icon = "✅" if check_exchange else "⬜"
+        st.markdown(f"**{icon} Exchange**")
+        if check_binance and check_revolutx:
+            st.caption("✅ Binance + Revolut X")
+        elif check_binance:
+            st.caption("✅ Binance")
+        elif check_revolutx:
+            st.caption("✅ Revolut X")
         else:
             st.caption("[→ Connecter](Integrations)")
 
