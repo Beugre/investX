@@ -175,15 +175,24 @@ with st.expander("5️⃣  Recharger votre compte en fonds", expanded=False):
     with tab_revolut5:
         st.markdown(
             """
-**Objectif** : avoir des euros disponibles sur votre compte Revolut X.
+**Objectif** : avoir des euros disponibles sur votre compte **Cryptos · EUR** dans Revolut.
 
-1. Dans l'app Revolut, assurez-vous d'avoir un **solde en EUR** sur votre compte principal.
-2. Revolut X utilise directement votre solde EUR — **aucune conversion nécessaire** !
-3. Si besoin, rechargez votre compte Revolut par **virement SEPA** ou **carte bancaire**.
+⚠️ **Important** : Revolut X utilise un portefeuille **"Cryptos · EUR"** séparé de votre compte EUR principal. Il faut transférer des fonds vers ce portefeuille.
 
-> 💡 Avec Revolut X, le bot achète directement en **EUR**. Pas besoin de convertir en USDC !
+**Comment faire :**
+1. Ouvrez l'app **Revolut**.
+2. Allez dans **Cryptos** → **Compte Cryptos · EUR**.
+3. Appuyez sur **Ajouter** ou **Transférer**.
+4. Sélectionnez votre **compte EUR principal** comme source.
+5. Entrez le montant à transférer (ex : 300 €) et confirmez.
+
+> ✅ Ce transfert est **instantané et gratuit** — c'est un simple virement interne entre vos comptes Revolut.
 >
-> Par exemple, si votre DCA quotidien est de 10 €, prévoyez au moins **300 €** pour un mois.
+> 💡 Le bot InvestX achète en **EUR** depuis votre solde "Cryptos · EUR". Assurez-vous que ce solde est suffisant.
+>
+> Par exemple, si votre DCA quotidien est de 10 €, prévoyez au moins **300 €** sur Cryptos · EUR pour un mois.
+>
+> ⚠️ Avoir des EUR sur votre compte Revolut principal **ne suffit pas** — il faut les transférer vers "Cryptos · EUR".
 """
         )
 

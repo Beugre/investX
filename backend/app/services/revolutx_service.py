@@ -110,7 +110,11 @@ def _request(
         if resp.status_code == 429:
             raise ExchangeError("Revolut X : trop de requêtes (rate limit)")
         if resp.status_code >= 400:
-            detail = resp.text[:200] if resp.text else str(resp.status_code)
+            detail = resp.text[:300] if resp.text else str(resp.status_code)
+            # Enrichir le message pour les erreurs de balance
+            detail_upper = detail.upper()
+            if "INSUFFICIENT" in detail_upper or "BALANCE" in detail_upper or "FUNDS" in detail_upper or "NOT_ENOUGH" in detail_upper:
+                raise ExchangeError(f"Revolut X : solde insuffisant – {detail}")
             raise ExchangeError(f"Revolut X API error {resp.status_code}: {detail}")
 
         if resp.status_code == 204:

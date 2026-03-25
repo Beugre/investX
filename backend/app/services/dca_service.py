@@ -220,18 +220,33 @@ def execute_user_dca(uid: str) -> dict | None:
     except (BinanceError, ExchangeError) as e:
         logger.error("DCA order failed for user %s: %s", uid, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
+        err_upper = str(e.message).upper()
         # Message utilisateur clair selon le type d'erreur
-        if "NOTIONAL" in str(e.message).upper():
+        if "NOTIONAL" in err_upper or "MIN_NOTIONAL" in err_upper:
             user_msg = (
                 f"⚠️ Montant trop faible pour {symbol}.\n"
-                f"Binance exige un minimum de 5 € par ordre.\n"
+                f"Minimum de 5 € par ordre requis.\n"
                 f"Montant configuré : {daily_amount:.2f} €.\n\n"
                 f"👉 Augmentez votre montant DCA dans le dashboard."
             )
-        elif "MIN_NOTIONAL" in str(e.message).upper():
+        elif exchange == "revolutx" and (
+            "INSUFFICIENT" in err_upper or "BALANCE" in err_upper
+            or "FUNDS" in err_upper or "NOT_ENOUGH" in err_upper
+        ):
             user_msg = (
-                f"⚠️ Montant trop faible pour {symbol}.\n"
-                f"Augmentez votre montant DCA (minimum 5 €)."
+                f"⚠️ Solde Revolut X insuffisant pour {symbol}.\n\n"
+                f"💰 **Important** : Revolut X utilise un portefeuille \"Cryptos · EUR\" séparé de votre compte EUR principal.\n\n"
+                f"👉 **Comment recharger :**\n"
+                f"1. Ouvrez l'app Revolut\n"
+                f"2. Allez dans **Cryptos** → **Compte Cryptos · EUR**\n"
+                f"3. Appuyez sur **Ajouter** ou **Transférer**\n"
+                f"4. Transférez des EUR depuis votre compte principal vers Cryptos · EUR\n\n"
+                f"💡 Ce transfert est instantané et gratuit."
+            )
+        elif "INSUFFICIENT" in err_upper or "BALANCE" in err_upper or "FUNDS" in err_upper:
+            user_msg = (
+                f"⚠️ Solde insuffisant pour {symbol}.\n"
+                f"👉 Rechargez votre compte en USDC sur Binance."
             )
         else:
             user_msg = f"Ordre DCA échoué pour {symbol} : {e.message}"
@@ -636,11 +651,31 @@ def _place_order_safe(
     except (BinanceError, ExchangeError) as e:
         logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
-        if "NOTIONAL" in str(e.message).upper():
+        err_upper = str(e.message).upper()
+        if "NOTIONAL" in err_upper:
             user_msg = (
                 f"⚠️ Montant trop faible pour {symbol}.\n"
                 f"Minimum de 5 € par ordre requis.\n\n"
                 f"👉 Augmentez votre montant DCA de base dans le dashboard."
+            )
+        elif exchange == "revolutx" and (
+            "INSUFFICIENT" in err_upper or "BALANCE" in err_upper
+            or "FUNDS" in err_upper or "NOT_ENOUGH" in err_upper
+        ):
+            user_msg = (
+                f"⚠️ Solde Revolut X insuffisant pour {symbol}.\n\n"
+                f"💰 **Important** : Revolut X utilise un portefeuille \"Cryptos · EUR\" séparé de votre compte EUR principal.\n\n"
+                f"👉 **Comment recharger :**\n"
+                f"1. Ouvrez l'app Revolut\n"
+                f"2. Allez dans **Cryptos** → **Compte Cryptos · EUR**\n"
+                f"3. Appuyez sur **Ajouter** ou **Transférer**\n"
+                f"4. Transférez des EUR depuis votre compte principal vers Cryptos · EUR\n\n"
+                f"💡 Ce transfert est instantané et gratuit."
+            )
+        elif "INSUFFICIENT" in err_upper or "BALANCE" in err_upper or "FUNDS" in err_upper:
+            user_msg = (
+                f"⚠️ Solde insuffisant pour {symbol}.\n"
+                f"👉 Rechargez votre compte en USDC sur Binance."
             )
         else:
             user_msg = f"Ordre DCA v2 échoué ({symbol}): {e.message}"
