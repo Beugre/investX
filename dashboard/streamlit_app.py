@@ -1,23 +1,88 @@
 """
-InvestX – Dashboard Streamlit (page d'accueil / login).
+InvestX – Page d'accueil.
+
+Avant connexion : mini landing page + formulaires login/signup.
+Après connexion : accueil personnalisé + barre de progression onboarding.
 """
 
 import streamlit as st
 from services.auth_client import sign_in_with_email_password, sign_up_with_email_password
-from services.api_client import init_onboarding
+from services.api_client import (
+    init_onboarding,
+    get_subscription_status,
+    get_binance_status,
+    get_telegram_settings,
+    get_dca_config,
+)
 from services.session_manager import try_restore_session, save_session, clear_session
 
 st.set_page_config(
-    page_title="InvestX – DCA Crypto",
+    page_title="InvestX – DCA Crypto Automatisé",
     page_icon="📈",
     layout="wide",
 )
 
-st.title("📈 InvestX – DCA Crypto Automatisé")
 
+# ══════════════════════════════════════════════════════
+# Landing page (visiteur non connecté)
+# ══════════════════════════════════════════════════════
 
-def _login_form():
-    """Formulaire de connexion."""
+def _landing_page():
+    """Mini landing page + formulaires login/signup."""
+
+    # ── Hero ──
+    st.markdown(
+        """
+        <div style="text-align:center; padding: 1rem 0 2rem 0;">
+            <h1 style="font-size:2.8rem; margin-bottom:0.3rem;">📈 InvestX</h1>
+            <p style="font-size:1.3rem; color:#888; margin-top:0;">
+                Investissez en crypto automatiquement, sans effort.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── 3 blocs valeur ──
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### 🤖 DCA Automatisé")
+        st.markdown(
+            "Achetez du Bitcoin & Ethereum chaque jour au meilleur moment. "
+            "Le bot s'occupe de tout, 24h/24."
+        )
+    with col2:
+        st.markdown("### 🧠 Stratégie RSI Intelligente")
+        st.markdown(
+            "Le mode avancé ajuste le montant investi selon le RSI, le MVRV "
+            "et le régime de marché. Achetez plus quand c'est bas."
+        )
+    with col3:
+        st.markdown("### 📊 Suivi en Temps Réel")
+        st.markdown(
+            "Dashboard avec courbes, PnL, historique des achats. "
+            "Notifications Telegram à chaque exécution."
+        )
+
+    st.divider()
+
+    # ── Comment ça marche ──
+    st.markdown("### 🚀 Comment ça marche ?")
+    steps = [
+        ("1️⃣", "Créez votre compte InvestX"),
+        ("2️⃣", "Connectez votre compte Binance via API"),
+        ("3️⃣", "Choisissez votre montant quotidien"),
+        ("4️⃣", "Le bot achète pour vous chaque jour"),
+    ]
+    cols = st.columns(4)
+    for i, (icon, text) in enumerate(steps):
+        with cols[i]:
+            st.markdown(f"**{icon}**")
+            st.markdown(text)
+
+    st.divider()
+
+    # ── Formulaires connexion ──
     st.subheader("🔐 Connexion")
 
     tab_login, tab_signup = st.tabs(["Se connecter", "Créer un compte"])
@@ -78,22 +143,129 @@ def _login_form():
                         st.error(f"❌ Erreur : {e}")
 
 
+# ══════════════════════════════════════════════════════
+# Page d'accueil connecté
+# ══════════════════════════════════════════════════════
+
 def _logged_in_home():
-    """Page d'accueil pour utilisateur connecté."""
-    st.success(f"Connecté en tant que **{st.session_state.get('email', '')}**")
+    """Accueil personnalisé avec barre de progression onboarding."""
+    token = st.session_state.get("token", "")
+    email = st.session_state.get("email", "")
 
-    st.markdown("""
-    ### Bienvenue sur InvestX 👋
+    st.markdown(
+        f"""
+        <div style="text-align:center; padding: 0.5rem 0 1rem 0;">
+            <h1 style="font-size:2.4rem; margin-bottom:0.2rem;">📈 InvestX</h1>
+            <p style="color:#888;">Bienvenue, <strong>{email}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    Utilisez le menu latéral pour naviguer :
+    # ── Barre de progression onboarding ──
+    st.subheader("🏁 Votre progression")
 
-    - **📊 Dashboard** – Vue d'ensemble de votre portfolio
-    - **⚙️ DCA Config** – Configurer votre achat automatique
-    - **💳 Subscription** – Gérer votre abonnement
-    - **🔗 Integrations** – Binance & Telegram
-    - **📜 History** – Historique de vos ordres
-    - **🛠 Settings** – Paramètres
-    """)
+    check_account = True  # connecté = OK
+
+    check_sub = False
+    try:
+        sub = get_subscription_status(token)
+        check_sub = sub.get("status") == "active"
+    except Exception:
+        pass
+
+    check_binance = False
+    try:
+        bs = get_binance_status(token)
+        check_binance = bs.get("is_connected", False)
+    except Exception:
+        pass
+
+    check_dca = False
+    try:
+        dca = get_dca_config(token)
+        check_dca = dca.get("enabled", False) if dca else False
+    except Exception:
+        pass
+
+    check_telegram = False
+    try:
+        tg = get_telegram_settings(token)
+        check_telegram = bool(tg.get("chat_id"))
+    except Exception:
+        pass
+
+    total_steps = 5
+    done = sum([check_account, check_sub, check_binance, check_dca, check_telegram])
+    progress = done / total_steps
+
+    st.progress(progress, text=f"{done}/{total_steps} étapes complétées")
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        icon = "✅" if check_account else "⬜"
+        st.markdown(f"**{icon} Compte**")
+        if check_account:
+            st.caption("Créé")
+        else:
+            st.caption("Créer un compte")
+
+    with col2:
+        icon = "✅" if check_sub else "⬜"
+        st.markdown(f"**{icon} Abonnement**")
+        if check_sub:
+            st.caption("Actif")
+        else:
+            st.caption("[→ S'abonner](Subscription)")
+
+    with col3:
+        icon = "✅" if check_binance else "⬜"
+        st.markdown(f"**{icon} Binance**")
+        if check_binance:
+            st.caption("Connecté")
+        else:
+            st.caption("[→ Connecter](Integrations)")
+
+    with col4:
+        icon = "✅" if check_dca else "⬜"
+        st.markdown(f"**{icon} DCA**")
+        if check_dca:
+            st.caption("Activé")
+        else:
+            st.caption("[→ Configurer](DCA_Config)")
+
+    with col5:
+        icon = "✅" if check_telegram else "⬜"
+        st.markdown(f"**{icon} Telegram**")
+        if check_telegram:
+            st.caption("Lié")
+        else:
+            st.caption("[→ Configurer](Integrations)")
+
+    if done == total_steps:
+        st.success("🎉 Tout est configuré ! Votre bot DCA est opérationnel.")
+    elif done >= 3:
+        st.info("💡 Presque terminé ! Consultez le **📖 Guide** dans le menu pour compléter la configuration.")
+    else:
+        st.warning("👉 Suivez le **📖 Guide** dans le menu latéral pour démarrer pas-à-pas.")
+
+    st.divider()
+
+    # ── Navigation rapide ──
+    st.subheader("🧭 Navigation rapide")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.page_link("pages/1_Dashboard.py", label="📊 Dashboard", icon="📊")
+        st.page_link("pages/2_DCA_Config.py", label="⚙️ Config DCA", icon="⚙️")
+    with c2:
+        st.page_link("pages/3_Subscription.py", label="💳 Abonnement", icon="💳")
+        st.page_link("pages/4_Integrations.py", label="🔗 Intégrations", icon="🔗")
+    with c3:
+        st.page_link("pages/5_History.py", label="📜 Historique", icon="📜")
+        st.page_link("pages/7_Guide.py", label="📖 Guide démarrage", icon="📖")
+
+    st.divider()
 
     if st.button("🚪 Se déconnecter"):
         clear_session()
@@ -108,4 +280,4 @@ if status == "loading":
 elif status == "restored":
     _logged_in_home()
 else:
-    _login_form()
+    _landing_page()
