@@ -10,6 +10,7 @@ from services.auth_client import (
     sign_in_with_email_password,
     sign_up_with_email_password,
     send_password_reset_email,
+    send_email_verification,
 )
 from services.api_client import (
     init_onboarding,
@@ -69,6 +70,15 @@ def _landing_page():
             "Dashboard avec courbes, PnL, historique des achats. "
             "Notifications Telegram à chaque exécution."
         )
+
+    st.divider()
+
+    # ── Disclaimer ──
+    st.caption(
+        "⚠️ **Avertissement** : L'investissement en cryptomonnaies comporte des risques "
+        "de perte en capital. Les performances passées ne garantissent pas les résultats "
+        "futurs. InvestX ne fournit pas de conseil en investissement."
+    )
 
     st.divider()
 
@@ -170,7 +180,13 @@ def _landing_page():
                         except Exception:
                             pass
 
-                        st.success("✅ Compte créé et connecté !")
+                        # Envoyer l'email de vérification
+                        try:
+                            send_email_verification(result["idToken"])
+                        except Exception:
+                            pass
+
+                        st.success("✅ Compte créé ! Un email de vérification a été envoyé.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Erreur : {e}")
@@ -333,3 +349,14 @@ elif status == "restored":
 else:
     st.markdown(_HIDE_SIDEBAR_NAV, unsafe_allow_html=True)
     _landing_page()
+
+# ── Footer global ──
+st.markdown("---")
+st.markdown(
+    "<div style='text-align:center; color:#888; font-size:0.85rem;'>"
+    "© 2026 InvestX · "
+    "<a href='/Mentions_Legales' target='_self' style='color:#888;'>Mentions légales</a> · "
+    "<a href='/FAQ' target='_self' style='color:#888;'>FAQ</a>"
+    "</div>",
+    unsafe_allow_html=True,
+)
