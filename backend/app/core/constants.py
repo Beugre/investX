@@ -4,8 +4,8 @@ Constantes centralisées de l'application.
 
 from typing import Final
 
-# ── Paires autorisées ──
-ALLOWED_SYMBOLS: Final[list[str]] = [
+# ── Paires autorisées par exchange ──
+BINANCE_SYMBOLS: Final[list[str]] = [
     "BTCUSDC",
     "ETHUSDC",
     "BNBUSDC",
@@ -13,9 +13,24 @@ ALLOWED_SYMBOLS: Final[list[str]] = [
     "SOLUSDC",
 ]
 
+REVOLUTX_SYMBOLS: Final[list[str]] = [
+    "BTC-EUR",
+    "ETH-EUR",
+    "BNB-EUR",
+    "ADA-EUR",
+    "SOL-EUR",
+]
+
+ALLOWED_SYMBOLS: Final[list[str]] = BINANCE_SYMBOLS + REVOLUTX_SYMBOLS
+
+EXCHANGE_SYMBOLS: Final[dict[str, list[str]]] = {
+    "binance": BINANCE_SYMBOLS,
+    "revolutx": REVOLUTX_SYMBOLS,
+}
+
 # ── Paires DCA RSI v2 ──
-DCA_V2_BTC_SYMBOLS: Final[list[str]] = ["BTCUSDC"]
-DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHUSDC"]
+DCA_V2_BTC_SYMBOLS: Final[list[str]] = ["BTCUSDC", "BTC-EUR"]
+DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHUSDC", "ETH-EUR"]
 DCA_V2_VALID_PAIRS: Final[dict[str, dict[str, str]]] = {
     "USDC": {"btc": "BTCUSDC", "eth": "ETHUSDC"},
     "EUR":  {"btc": "BTC-EUR", "eth": "ETH-EUR"},

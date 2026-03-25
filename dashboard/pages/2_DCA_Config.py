@@ -24,6 +24,7 @@ from services.api_client import (
     get_dca_v2_crash_reserve,
     get_dca_v2_auto_config,
     simulate_dca_v2,
+    get_active_exchange,
 )
 
 st.set_page_config(page_title="DCA Config – InvestX", page_icon="⚙️", layout="wide")
@@ -32,6 +33,22 @@ st.title("⚙️ Configuration DCA")
 token = require_auth()
 if not token:
     st.stop()
+
+# ── Exchange actif & paires correspondantes ──
+BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
+REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR"]
+
+try:
+    active_exchange = get_active_exchange(token)
+except Exception:
+    active_exchange = "binance"
+
+is_revolutx = active_exchange == "revolutx"
+available_pairs = REVOLUTX_PAIRS if is_revolutx else BINANCE_PAIRS
+exchange_label = "🔵 Revolut X" if is_revolutx else "🟡 Binance"
+quote_currency = "EUR" if is_revolutx else "USDC"
+
+st.info(f"Exchange actif : **{exchange_label}** — Les paires affichées correspondent à cet exchange.")
 
 # ── Sélection du mode ──
 mode = st.radio(
@@ -59,22 +76,21 @@ if mode == "simple (v1)":
             "DCA activé",
             value=current.get("enabled", False) if current else False,
         )
+        default_symbol = available_pairs[0]
+        current_symbol = current.get("symbol", default_symbol) if current else default_symbol
+        if current_symbol not in available_pairs:
+            current_symbol = default_symbol
         symbol = st.selectbox(
             "Paire",
-            ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"],
-            index=(
-                ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"].index(
-                    current.get("symbol", "BTCUSDC")
-                )
-                if current and current.get("symbol") in ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
-                else 0
-            ),
+            available_pairs,
+            index=available_pairs.index(current_symbol),
         )
+        amount_label = "Montant quotidien (€)" if is_revolutx else "Montant quotidien ($)"
         daily_amount = st.number_input(
-            "Montant quotidien ($)",
+            amount_label,
             min_value=5.0, max_value=10000.0, step=1.0,
             value=max(5.0, current.get("daily_amount_eur", 10.0)) if current else 10.0,
-            help="Minimum 5 $ (exigé par Binance)",
+            help="Minimum 5 € / $",
         )
         col1, col2 = st.columns(2)
         with col1:
@@ -138,13 +154,15 @@ except Exception as e:
 # ────────────────────────────────────────────────────
 st.markdown("### 💰 Montant de base quotidien")
 
+currency_symbol = "€" if is_revolutx else "$"
+
 base_amount = st.slider(
-    "Montant de base (×1) en $",
+    f"Montant de base (×1) en {currency_symbol}",
     min_value=5.0,
     max_value=500.0,
     value=max(5.0, float((v2_config or {}).get("base_daily_amount", 12.0))),
     step=1.0,
-    help="Minimum 5 $ (exigé par Binance). C'est le montant investi quand RSI = WARM (×1) et MVRV = FAIR (×1).",
+    help=f"Minimum 5 {currency_symbol}. C'est le montant investi quand RSI = WARM (×1) et MVRV = FAIR (×1).",
 )
 
 # Auto-calcul des paramètres recommandés
@@ -194,14 +212,14 @@ if sim_data:
     # Afficher les extrêmes en métriques
     if extremes:
         c1, c2, c3 = st.columns(3)
-        c1.metric("Min / jour", f"${extremes.get('min_daily', 0):.2f}")
-        c2.metric("Max / jour", f"${extremes.get('max_daily', 0):.2f}")
-        c3.metric("Moy / jour", f"${extremes.get('avg_daily', 0):.2f}")
+        c1.metric("Min / jour", f"{currency_symbol}{extremes.get('min_daily', 0):.2f}")
+        c2.metric("Max / jour", f"{currency_symbol}{extremes.get('max_daily', 0):.2f}")
+        c3.metric("Moy / jour", f"{currency_symbol}{extremes.get('avg_daily', 0):.2f}")
 
         c4, c5, c6 = st.columns(3)
-        c4.metric("Est. min / mois", f"${extremes.get('est_monthly_min', 0):.0f}")
-        c5.metric("Est. max / mois", f"${extremes.get('est_monthly_max', 0):.0f}")
-        c6.metric("Est. moy / mois", f"${extremes.get('est_monthly_avg', 0):.0f}")
+        c4.metric("Est. min / mois", f"{currency_symbol}{extremes.get('est_monthly_min', 0):.0f}")
+        c5.metric("Est. max / mois", f"{currency_symbol}{extremes.get('est_monthly_max', 0):.0f}")
+        c6.metric("Est. moy / mois", f"{currency_symbol}{extremes.get('est_monthly_avg', 0):.0f}")
 
     # Construire la grille pivot : RSI (lignes) × MVRV (colonnes) pour régime NORMAL
     normal_rows = [
@@ -229,15 +247,15 @@ if sim_data:
             "FAIR_OR_ABOVE": "➡️ MVRV ≥ 1.0 (×1)",
         }
         row_labels = {
-            "OVERSOLD": f"🟢 OVERSOLD (×3) = ${base_amount * 3:.0f} base",
-            "NEUTRAL": f"🔵 NEUTRAL (×2) = ${base_amount * 2:.0f} base",
-            "WARM": f"🟡 WARM (×1) = ${base_amount:.0f} base",
-            "OVERBOUGHT": "🔴 OVERBOUGHT (×0) = $0",
+            "OVERSOLD": f"🟢 OVERSOLD (×3) = {currency_symbol}{base_amount * 3:.0f} base",
+            "NEUTRAL": f"🔵 NEUTRAL (×2) = {currency_symbol}{base_amount * 2:.0f} base",
+            "WARM": f"🟡 WARM (×1) = {currency_symbol}{base_amount:.0f} base",
+            "OVERBOUGHT": f"🔴 OVERBOUGHT (×0) = {currency_symbol}0",
         }
         pivot = pivot.rename(index=row_labels, columns=col_labels)
 
         st.dataframe(
-            pivot.style.format("${:.2f}").applymap(
+            pivot.style.format(f"{currency_symbol}{{:.2f}}").applymap(
                 lambda v: (
                     "background-color: #1a472a; color: #4ade80"
                     if isinstance(v, (int, float)) and v >= base_amount * 3
@@ -256,10 +274,10 @@ if sim_data:
         )
 
         st.info(
-            f"💡 **Avec un base de ${base_amount:.0f}/jour** :\n"
-            f"- En accumulation forte (RSI OVERSOLD + MVRV < 0.85) → **${base_amount * 3 * 2:.0f}/jour**\n"
-            f"- En marché neutre (RSI NEUTRAL + MVRV fair) → **${base_amount * 2:.0f}/jour**\n"
-            f"- En surchauffe (RSI OVERBOUGHT) → **$0/jour** (aucun achat)"
+            f"💡 **Avec un base de {currency_symbol}{base_amount:.0f}/jour** :\n"
+            f"- En accumulation forte (RSI OVERSOLD + MVRV < 0.85) → **{currency_symbol}{base_amount * 3 * 2:.0f}/jour**\n"
+            f"- En marché neutre (RSI NEUTRAL + MVRV fair) → **{currency_symbol}{base_amount * 2:.0f}/jour**\n"
+            f"- En surchauffe (RSI OVERBOUGHT) → **{currency_symbol}0/jour** (aucun achat)"
         )
 
 
@@ -288,11 +306,13 @@ with st.form("dca_v2_form"):
             value=(v2_config or {}).get("enabled", False),
         )
     with col_q:
-        quote = st.selectbox(
+        st.text_input(
             "Devise",
-            ["EUR", "USD"],
-            index=["EUR", "USD"].index((v2_config or {}).get("quote_currency", "EUR")),
+            value=quote_currency,
+            disabled=True,
+            help="Devise déterminée par votre exchange actif.",
         )
+        quote = quote_currency
 
     col_h, col_m = st.columns(2)
     with col_h:
@@ -318,14 +338,14 @@ with st.form("dca_v2_form"):
     st.markdown("#### 🛡️ Spending Caps (plafonds de dépenses)")
     if not manual_override:
         st.caption(
-            f"Calculés automatiquement pour un base de ${base_amount:.0f}/jour. "
+            f"Calculés automatiquement pour un base de {currency_symbol}{base_amount:.0f}/jour. "
             "Activez le mode avancé pour modifier."
         )
 
     col_d, col_w, col_mo = st.columns(3)
     with col_d:
         daily_cap = st.number_input(
-            "Cap quotidien ($)",
+            f"Cap quotidien ({currency_symbol})",
             min_value=1.0, step=10.0,
             value=float(
                 existing_caps.get("daily_cap", auto_caps.get("daily_cap", 150.0))
@@ -336,7 +356,7 @@ with st.form("dca_v2_form"):
         )
     with col_w:
         weekly_cap = st.number_input(
-            "Cap hebdomadaire ($)",
+            f"Cap hebdomadaire ({currency_symbol})",
             min_value=1.0, step=50.0,
             value=float(
                 existing_caps.get("weekly_cap", auto_caps.get("weekly_cap", 400.0))
@@ -347,7 +367,7 @@ with st.form("dca_v2_form"):
         )
     with col_mo:
         monthly_cap = st.number_input(
-            "Cap mensuel ($)",
+            f"Cap mensuel ({currency_symbol})",
             min_value=1.0, step=100.0,
             value=float(
                 existing_caps.get("monthly_cap", auto_caps.get("monthly_cap", 1500.0))
@@ -368,7 +388,7 @@ with st.form("dca_v2_form"):
     col_bt, col_bh = st.columns(2)
     with col_bt:
         boost_threshold = st.number_input(
-            "Seuil boost ($)",
+            f"Seuil boost ({currency_symbol})",
             min_value=1.0, step=10.0,
             value=float(
                 existing_boost.get("threshold", auto_boost.get("threshold", 120.0))
@@ -403,7 +423,7 @@ with st.form("dca_v2_form"):
         value=existing_crash.get("enabled", True),
     )
     crash_budget = st.number_input(
-        "Budget total Crash Reserve ($)",
+        f"Budget total Crash Reserve ({currency_symbol})",
         min_value=0.0, step=100.0,
         value=float(
             existing_crash.get("total_budget", auto_crash_budget)
@@ -476,21 +496,21 @@ with st.expander("📊 Indicateurs en temps réel", expanded=True):
             c2.metric("MA200", f"${status.get('ma200', 0):,.0f}", status.get("regime", ""))
             mvrv_val = status.get("mvrv")
             c3.metric("MVRV", f"{mvrv_val:.2f}" if mvrv_val else "N/A")
-            c4.metric("Montant prévu", f"${status.get('raw_amount', 0):.2f}")
+            c4.metric("Montant prévu", f"{currency_symbol}{status.get('raw_amount', 0):.2f}")
 
             st.divider()
             col_a, col_b = st.columns(2)
             with col_a:
                 st.write("**Split calculé**")
-                st.write(f"BTC ({status.get('btc_pct', 90)}%) : ${status.get('btc_amount', 0):.2f}")
-                st.write(f"ETH ({status.get('eth_pct', 10)}%) : ${status.get('eth_amount', 0):.2f}")
+                st.write(f"BTC ({status.get('btc_pct', 90)}%) : {currency_symbol}{status.get('btc_amount', 0):.2f}")
+                st.write(f"ETH ({status.get('eth_pct', 10)}%) : {currency_symbol}{status.get('eth_amount', 0):.2f}")
             with col_b:
                 if status.get("crash_reserve"):
                     cr = status["crash_reserve"]
                     st.write("**Crash Reserve**")
                     st.write(f"Drop: {cr.get('drop_pct', 0):.1f}%")
                     st.write(f"Niveaux déclenchés: {cr.get('triggered_levels', [])}")
-                    st.write(f"Budget restant: ${cr.get('reserve_remaining', 0):.2f}")
+                    st.write(f"Budget restant: {currency_symbol}{cr.get('reserve_remaining', 0):.2f}")
     except Exception as e:
         st.info(f"Indicateurs indisponibles : {e}")
 
@@ -501,18 +521,18 @@ with st.expander("💰 Dépenses en cours"):
         c1, c2, c3 = st.columns(3)
         c1.metric(
             "Aujourd'hui",
-            f"${spending.get('spent_today', 0):.2f}",
-            f"reste ${spending.get('daily_remaining', 0):.2f}",
+            f"{currency_symbol}{spending.get('spent_today', 0):.2f}",
+            f"reste {currency_symbol}{spending.get('daily_remaining', 0):.2f}",
         )
         c2.metric(
             "Cette semaine",
-            f"${spending.get('spent_this_week', 0):.2f}",
-            f"reste ${spending.get('weekly_remaining', 0):.2f}",
+            f"{currency_symbol}{spending.get('spent_this_week', 0):.2f}",
+            f"reste {currency_symbol}{spending.get('weekly_remaining', 0):.2f}",
         )
         c3.metric(
             "Ce mois",
-            f"${spending.get('spent_this_month', 0):.2f}",
-            f"reste ${spending.get('monthly_remaining', 0):.2f}",
+            f"{currency_symbol}{spending.get('spent_this_month', 0):.2f}",
+            f"reste {currency_symbol}{spending.get('monthly_remaining', 0):.2f}",
         )
     except Exception as e:
         st.info(f"Dépenses indisponibles : {e}")
@@ -522,9 +542,9 @@ with st.expander("🚨 Crash Reserve"):
     try:
         reserve = get_dca_v2_crash_reserve(token)
         c1, c2, c3 = st.columns(3)
-        c1.metric("Budget total", f"${reserve.get('total_budget', 0):.2f}")
-        c2.metric("Dépensé", f"${reserve.get('spent', 0):.2f}")
-        c3.metric("Restant", f"${reserve.get('remaining', 0):.2f}")
+        c1.metric("Budget total", f"{currency_symbol}{reserve.get('total_budget', 0):.2f}")
+        c2.metric("Dépensé", f"{currency_symbol}{reserve.get('spent', 0):.2f}")
+        c3.metric("Restant", f"{currency_symbol}{reserve.get('remaining', 0):.2f}")
         if reserve.get("levels_triggered"):
             st.write(f"Niveaux déclenchés : {', '.join(reserve['levels_triggered'])}")
     except Exception as e:
