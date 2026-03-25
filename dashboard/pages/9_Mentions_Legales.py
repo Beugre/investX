@@ -38,8 +38,8 @@ InvestX est un outil d'automatisation d'achats récurrents de cryptomonnaies
 
 ### 2. Éditeur du service
 
-- **Nom** : *[À compléter – nom ou raison sociale]*
-- **Adresse** : *[À compléter]*
+- **Nom** : InvestX
+- **Adresse** : 6 chemin de Baudin, 33320 Le Taillan-Médoc, France
 - **Email** : contact@investxbot.com
 - **Hébergeur** : Contabo GmbH, Aschauer Straße 32a, 81549 München, Allemagne
 
@@ -114,7 +114,7 @@ with tab_privacy:
 
 ### 1. Responsable du traitement
 
-- **Nom** : *[À compléter]*
+- **Nom** : InvestX
 - **Email** : contact@investxbot.com
 
 ### 2. Données collectées
