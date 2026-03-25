@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from firebase_admin import auth as firebase_auth
 
 from app.core.auth_firebase import get_current_uid
-from app.core.exceptions import NotFound
+from app.core.exceptions import NotFound, BadRequest
 from pydantic import BaseModel
 from app.schemas.user import UserProfile, OnboardingResponse
 from app.services import firestore_service, email_service
@@ -93,3 +93,29 @@ async def update_profile(
 
     user = firestore_service.get_user(uid)
     return UserProfile(**user)
+
+
+# ── Active Exchange ──
+
+@router.get("/me/exchange")
+async def get_active_exchange(uid: str = Depends(get_current_uid)):
+    """Retourne l'exchange actif de l'utilisateur."""
+    exchange = firestore_service.get_active_exchange(uid)
+    return {"active_exchange": exchange}
+
+
+class SetExchangeRequest(BaseModel):
+    exchange: str
+
+
+@router.put("/me/exchange")
+async def set_active_exchange(
+    body: SetExchangeRequest,
+    uid: str = Depends(get_current_uid),
+):
+    """Définit l'exchange actif."""
+    from app.core.constants import SUPPORTED_EXCHANGES
+    if body.exchange not in SUPPORTED_EXCHANGES:
+        raise BadRequest(f"Exchange '{body.exchange}' not supported. Valid: {SUPPORTED_EXCHANGES}")
+    firestore_service.set_active_exchange(uid, body.exchange)
+    return {"active_exchange": body.exchange}

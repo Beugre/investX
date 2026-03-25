@@ -96,3 +96,59 @@ def delete_binance_secret(uid: str) -> None:
     except Exception as e:
         logger.error("Failed to delete Binance credentials for user %s: %s", uid, e)
         raise SecretManagerError(f"Failed to delete credentials: {e}") from e
+
+
+# ════════════════════════════════════════════════════════
+# Revolut X credentials (api_key + private_key_pem)
+# ════════════════════════════════════════════════════════
+
+def create_or_update_revolutx_secret(uid: str, api_key: str, private_key_pem: str) -> str:
+    """Chiffre et stocke les credentials Revolut X dans Firestore."""
+    try:
+        fernet = _get_fernet()
+        payload = json.dumps({"api_key": api_key, "private_key_pem": private_key_pem})
+        encrypted = fernet.encrypt(payload.encode("utf-8")).decode("utf-8")
+
+        db = _get_firestore_db()
+        doc_ref = db.collection("revolutx_secrets").document(uid)
+        doc_ref.set({"encrypted_credentials": encrypted})
+
+        secret_ref = f"firestore://revolutx_secrets/{uid}"
+        logger.info("Revolut X credentials stored (encrypted) for user %s", uid)
+        return secret_ref
+    except Exception as e:
+        logger.error("Failed to store Revolut X credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to store credentials: {e}") from e
+
+
+def get_revolutx_secret(uid: str) -> dict[str, str]:
+    """Déchiffre et retourne les credentials Revolut X.
+    Retourne {"api_key": "...", "private_key_pem": "..."}.
+    """
+    try:
+        db = _get_firestore_db()
+        doc = db.collection("revolutx_secrets").document(uid).get()
+        if not doc.exists:
+            raise SecretManagerError(f"No Revolut X credentials found for user {uid}")
+
+        encrypted = doc.to_dict()["encrypted_credentials"]
+        fernet = _get_fernet()
+        decrypted = fernet.decrypt(encrypted.encode("utf-8")).decode("utf-8")
+        data = json.loads(decrypted)
+        return {"api_key": data["api_key"], "private_key_pem": data["private_key_pem"]}
+    except SecretManagerError:
+        raise
+    except Exception as e:
+        logger.error("Failed to retrieve Revolut X credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to retrieve credentials: {e}") from e
+
+
+def delete_revolutx_secret(uid: str) -> None:
+    """Supprime les credentials Revolut X chiffrées."""
+    try:
+        db = _get_firestore_db()
+        db.collection("revolutx_secrets").document(uid).delete()
+        logger.info("Revolut X credentials deleted for user %s", uid)
+    except Exception as e:
+        logger.error("Failed to delete Revolut X credentials for user %s: %s", uid, e)
+        raise SecretManagerError(f"Failed to delete credentials: {e}") from e

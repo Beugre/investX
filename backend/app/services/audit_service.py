@@ -12,6 +12,8 @@ from app.core.constants import (
     AUDIT_CRASH_BUY,
     AUDIT_BINANCE_CONNECTED,
     AUDIT_BINANCE_DISCONNECTED,
+    AUDIT_REVOLUTX_CONNECTED,
+    AUDIT_REVOLUTX_DISCONNECTED,
     AUDIT_SUBSCRIPTION_UPDATED,
     AUDIT_TELEGRAM_LINKED,
 )
@@ -52,6 +54,24 @@ def log_binance_disconnected(uid: str) -> None:
         action=AUDIT_BINANCE_DISCONNECTED,
         status="SUCCESS",
         message="Binance account disconnected",
+    )
+
+
+def log_revolutx_connected(uid: str) -> None:
+    firestore_service.save_audit_log(
+        uid=uid,
+        action=AUDIT_REVOLUTX_CONNECTED,
+        status="SUCCESS",
+        message="Revolut X account connected",
+    )
+
+
+def log_revolutx_disconnected(uid: str) -> None:
+    firestore_service.save_audit_log(
+        uid=uid,
+        action=AUDIT_REVOLUTX_DISCONNECTED,
+        status="SUCCESS",
+        message="Revolut X account disconnected",
     )
 
 

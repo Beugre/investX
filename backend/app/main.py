@@ -26,6 +26,7 @@ from app.api.health import router as health_router
 from app.api.users import router as users_router
 from app.api.dca import router as dca_router
 from app.api.binance import router as binance_router
+from app.api.revolutx import router as revolutx_router
 from app.api.stripe import router as stripe_router
 from app.api.telegram import router as telegram_router
 from app.api.portfolio import router as portfolio_router
@@ -97,6 +98,7 @@ app.include_router(health_router)
 app.include_router(users_router)
 app.include_router(dca_router)
 app.include_router(binance_router)
+app.include_router(revolutx_router)
 app.include_router(stripe_router)
 app.include_router(telegram_router)
 app.include_router(portfolio_router)

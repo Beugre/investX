@@ -18,6 +18,19 @@ DCA_V2_BTC_SYMBOLS: Final[list[str]] = ["BTCUSDC"]
 DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHUSDC"]
 DCA_V2_VALID_PAIRS: Final[dict[str, dict[str, str]]] = {
     "USDC": {"btc": "BTCUSDC", "eth": "ETHUSDC"},
+    "EUR":  {"btc": "BTC-EUR", "eth": "ETH-EUR"},
+}
+
+# ── Exchanges supportés ──
+EXCHANGE_BINANCE: Final[str] = "binance"
+EXCHANGE_REVOLUTX: Final[str] = "revolutx"
+SUPPORTED_EXCHANGES: Final[list[str]] = [EXCHANGE_BINANCE, EXCHANGE_REVOLUTX]
+DEFAULT_EXCHANGE: Final[str] = EXCHANGE_BINANCE
+
+# ── Quote currency par exchange ──
+EXCHANGE_DEFAULT_QUOTE: Final[dict[str, str]] = {
+    EXCHANGE_BINANCE: "USDC",
+    EXCHANGE_REVOLUTX: "EUR",
 }
 
 # ── Timezone par défaut ──
@@ -117,5 +130,7 @@ AUDIT_DCA_SKIPPED: Final[str] = "DCA_ORDER_SKIPPED"
 AUDIT_CRASH_BUY: Final[str] = "CRASH_RESERVE_BUY"
 AUDIT_BINANCE_CONNECTED: Final[str] = "BINANCE_CONNECTED"
 AUDIT_BINANCE_DISCONNECTED: Final[str] = "BINANCE_DISCONNECTED"
+AUDIT_REVOLUTX_CONNECTED: Final[str] = "REVOLUTX_CONNECTED"
+AUDIT_REVOLUTX_DISCONNECTED: Final[str] = "REVOLUTX_DISCONNECTED"
 AUDIT_SUBSCRIPTION_UPDATED: Final[str] = "SUBSCRIPTION_UPDATED"
 AUDIT_TELEGRAM_LINKED: Final[str] = "TELEGRAM_LINKED"

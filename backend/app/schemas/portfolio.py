@@ -50,3 +50,15 @@ class BinanceStatusResponse(BaseModel):
     exchange: str = "binance"
     label: str | None = None
     permissions_validated: bool = False
+
+
+class RevolutXConnectRequest(BaseModel):
+    api_key: str
+    private_key_pem: str
+
+
+class RevolutXStatusResponse(BaseModel):
+    is_connected: bool = False
+    exchange: str = "revolutx"
+    label: str | None = None
+    permissions_validated: bool = False

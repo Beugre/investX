@@ -185,6 +185,36 @@ def disconnect_binance(token: str) -> dict:
     return _delete("/binance/disconnect", token)
 
 
+# ── Revolut X ──
+def get_revolutx_status(token: str) -> dict:
+    return _get("/revolutx/status", token)
+
+
+def connect_revolutx(token: str, api_key: str, private_key_pem: str) -> dict:
+    return _post("/revolutx/connect", token, json={
+        "api_key": api_key,
+        "private_key_pem": private_key_pem,
+    })
+
+
+def validate_revolutx(token: str) -> dict:
+    return _post("/revolutx/validate", token)
+
+
+def disconnect_revolutx(token: str) -> dict:
+    return _delete("/revolutx/disconnect", token)
+
+
+# ── Exchange actif ──
+def get_active_exchange(token: str) -> str:
+    result = _get("/me/exchange", token)
+    return result.get("active_exchange", "binance")
+
+
+def set_active_exchange(token: str, exchange: str) -> dict:
+    return _put("/me/exchange", token, json={"exchange": exchange})
+
+
 # ── Portfolio ──
 def get_portfolio_summary(token: str) -> dict:
     return _get("/portfolio/summary", token)

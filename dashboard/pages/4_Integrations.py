@@ -1,5 +1,5 @@
 """
-Page 4 – Intégrations (Binance & Telegram).
+Page 4 – Intégrations (Binance, Revolut X & Telegram).
 """
 
 import streamlit as st
@@ -10,6 +10,10 @@ from services.api_client import (
     connect_binance,
     validate_binance,
     disconnect_binance,
+    get_revolutx_status,
+    connect_revolutx,
+    validate_revolutx,
+    disconnect_revolutx,
     get_telegram_settings,
     link_telegram,
     test_telegram,
@@ -82,6 +86,81 @@ else:
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Erreur : {e}")
+
+st.divider()
+
+# ════════════════════ REVOLUT X ════════════════════
+st.header("🔵 Revolut X")
+
+try:
+    revolutx_status = get_revolutx_status(token)
+except Exception as e:
+    st.error(f"Erreur Revolut X : {e}")
+    revolutx_status = {}
+
+rx_connected = revolutx_status.get("is_connected", False)
+
+if rx_connected:
+    st.success("✅ Revolut X connecté")
+    st.write(f"Permissions validées : {'✅' if revolutx_status.get('permissions_validated') else '❌'}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Re-valider", key="rx_validate"):
+            try:
+                result = validate_revolutx(token)
+                if result.get("valid"):
+                    st.success("✅ Credentials valides")
+                else:
+                    st.warning(f"⚠️ {result.get('message', 'Issue detected')}")
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+
+    with col2:
+        if st.button("🔌 Déconnecter Revolut X", key="rx_disconnect"):
+            try:
+                disconnect_revolutx(token)
+                st.success("Revolut X déconnecté")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+else:
+    st.warning("Revolut X non connecté.")
+    st.markdown("""
+    **Instructions :**
+    1. Allez dans votre app Revolut → Hub → Revolut X
+    2. Ouvrez **Paramètres API** et créez une clé API
+    3. Générez une paire de clés **Ed25519** (la clé publique est enregistrée dans Revolut X)
+    4. Collez votre **API Key** et votre **clé privée PEM** ci-dessous
+    """)
+
+    with st.form("revolutx_connect_form"):
+        rx_api_key = st.text_input("API Key Revolut X")
+        rx_private_key = st.text_area(
+            "Clé privée Ed25519 (PEM)",
+            height=150,
+            placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
+        )
+        rx_submitted = st.form_submit_button("🔗 Connecter Revolut X")
+
+        if rx_submitted:
+            if not rx_api_key or not rx_private_key:
+                st.error("Veuillez remplir les deux champs.")
+            else:
+                try:
+                    connect_revolutx(token, rx_api_key, rx_private_key.strip())
+                    st.success("✅ Revolut X connecté !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur : {e}")
+
+# ═══════════════ INFO EXCHANGE ACTIF ════════════════
+if is_connected and rx_connected:
+    st.divider()
+    st.info(
+        "💡 **Deux exchanges connectés** — L'exchange actif est celui connecté en dernier. "
+        "Déconnectez l'un pour utiliser l'autre pour vos DCA."
+    )
 
 st.divider()
 

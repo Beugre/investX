@@ -43,6 +43,14 @@ class BinanceError(Exception):
         super().__init__(self.message)
 
 
+class ExchangeError(Exception):
+    """Erreur générique pour tout exchange (Revolut X, etc.)."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+
 class SecretManagerError(Exception):
     """Erreur lors d'une opération Secret Manager."""
 

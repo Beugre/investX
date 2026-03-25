@@ -152,6 +152,60 @@ def delete_binance_account(uid: str) -> None:
     logger.info("Binance account deleted for user %s", uid)
 
 
+# ────────────────────── Revolut X Account ──────────────────────
+
+def get_revolutx_account(uid: str) -> dict[str, Any] | None:
+    doc = (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("revolutx_account")
+        .document("main")
+        .get()
+    )
+    return doc.to_dict() if doc.exists else None
+
+
+def update_revolutx_account(uid: str, data: dict[str, Any]) -> None:
+    data["updated_at"] = datetime.now(timezone.utc)
+    (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("revolutx_account")
+        .document("main")
+        .set(data, merge=True)
+    )
+
+
+def delete_revolutx_account(uid: str) -> None:
+    (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("revolutx_account")
+        .document("main")
+        .delete()
+    )
+    logger.info("Revolut X account deleted for user %s", uid)
+
+
+# ────────────────────── Active Exchange ──────────────────────
+
+def get_active_exchange(uid: str) -> str:
+    """Retourne l'exchange actif de l'utilisateur ('binance' ou 'revolutx')."""
+    user = get_user(uid)
+    if not user:
+        return "binance"
+    return user.get("active_exchange", "binance")
+
+
+def set_active_exchange(uid: str, exchange: str) -> None:
+    """Définit l'exchange actif de l'utilisateur."""
+    update_user(uid, {"active_exchange": exchange})
+    logger.info("Active exchange set to '%s' for user %s", exchange, uid)
+
+
 # ────────────────────── Telegram ──────────────────────
 
 def get_telegram_settings(uid: str) -> dict[str, Any] | None:

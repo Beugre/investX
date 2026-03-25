@@ -19,6 +19,9 @@ python-binance==1.0.19
 # Telegram
 httpx==0.28.1
 
+# Crypto (Ed25519 pour Revolut X)
+cryptography>=42.0.0
+
 # Scheduler
 apscheduler==3.10.4
 

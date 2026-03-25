@@ -30,12 +30,13 @@ from app.core.constants import (
     CRASH_ROLLING_HIGH_DAYS,
     DEFAULT_REGIME_RULES,
 )
-from app.core.exceptions import BinanceError
+from app.core.exceptions import BinanceError, ExchangeError
 from firebase_admin import auth as firebase_auth
 from app.services import (
     firestore_service,
     secret_manager_service,
     binance_service,
+    revolutx_service,
     portfolio_service,
     telegram_service,
     subscription_service,
@@ -46,6 +47,65 @@ from app.services import (
 from app.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# ══════════════════════════════════════════════════════
+# Helpers exchange-routing
+# ══════════════════════════════════════════════════════
+
+def _get_exchange_context(uid: str) -> dict | None:
+    """Détermine l'exchange actif et retourne les infos nécessaires.
+    Retourne un dict avec exchange, account, creds, ou None si rien n'est connecté.
+    """
+    exchange = firestore_service.get_active_exchange(uid)
+
+    if exchange == "revolutx":
+        account = firestore_service.get_revolutx_account(uid)
+        if account and account.get("is_connected"):
+            try:
+                creds = secret_manager_service.get_revolutx_secret(uid)
+                return {"exchange": "revolutx", "account": account, "creds": creds}
+            except Exception as e:
+                logger.error("Cannot retrieve Revolut X credentials for user %s: %s", uid, e)
+                return None
+
+    # Fallback ou exchange == "binance"
+    account = firestore_service.get_binance_account(uid)
+    if account and account.get("is_connected"):
+        try:
+            creds = secret_manager_service.get_binance_secret(uid)
+            return {"exchange": "binance", "account": account, "creds": creds}
+        except Exception as e:
+            logger.error("Cannot retrieve Binance credentials for user %s: %s", uid, e)
+            return None
+
+    return None
+
+
+def _place_exchange_order(exchange: str, creds: dict, symbol: str, quote_amount: float) -> dict:
+    """Place un ordre market buy sur l'exchange approprié."""
+    if exchange == "revolutx":
+        return revolutx_service.place_market_buy_order(
+            api_key=creds["api_key"],
+            private_key_pem=creds["private_key_pem"],
+            symbol=symbol,
+            quote_amount=quote_amount,
+        )
+    else:
+        return binance_service.place_market_buy_order(
+            api_key=creds["api_key"],
+            api_secret=creds["api_secret"],
+            symbol=symbol,
+            quote_amount=quote_amount,
+        )
+
+
+def _get_klines_for_exchange(exchange: str, symbol: str, limit: int = 250) -> list:
+    """Récupère les klines quotidiennes selon l'exchange."""
+    if exchange == "revolutx":
+        return revolutx_service.get_daily_klines_public(symbol, limit)
+    else:
+        return binance_service.get_daily_klines_public(symbol, limit)
 
 
 # ══════════════════════════════════════════════════════
@@ -144,29 +204,20 @@ def execute_user_dca(uid: str) -> dict | None:
             return None
         logger.info("Force rebuy activated for user %s / %s", uid, symbol)
 
-    # 5. Vérifier Binance connecté
-    binance_account = firestore_service.get_binance_account(uid)
-    if not binance_account or not binance_account.get("is_connected"):
-        logger.warning("Skipping DCA for user %s: Binance not connected", uid)
+    # 5. Vérifier exchange connecté
+    ctx = _get_exchange_context(uid)
+    if not ctx:
+        logger.warning("Skipping DCA for user %s: no exchange connected", uid)
         return None
 
-    # 6. Récupérer credentials
-    try:
-        creds = secret_manager_service.get_binance_secret(uid)
-    except Exception as e:
-        logger.error("Cannot retrieve Binance credentials for user %s: %s", uid, e)
-        audit_service.log_dca_failed(uid, symbol, str(e))
-        return None
+    # 6. Credentials déjà récupérées par _get_exchange_context
+    creds = ctx["creds"]
+    exchange = ctx["exchange"]
 
     # 7. Passer l'ordre
     try:
-        order_data = binance_service.place_market_buy_order(
-            api_key=creds["api_key"],
-            api_secret=creds["api_secret"],
-            symbol=symbol,
-            quote_amount=daily_amount,
-        )
-    except BinanceError as e:
+        order_data = _place_exchange_order(exchange, creds, symbol, daily_amount)
+    except (BinanceError, ExchangeError) as e:
         logger.error("DCA order failed for user %s: %s", uid, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
         # Message utilisateur clair selon le type d'erreur
@@ -241,20 +292,19 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     if not should_run_now(config):
         return None
 
-    # ── 2. Binance connecté + credentials ────────────
-    binance_account = firestore_service.get_binance_account(uid)
-    if not binance_account or not binance_account.get("is_connected"):
-        logger.warning("DCA v2 skip user %s: Binance not connected", uid)
+    # ── 2. Exchange connecté + credentials ────────────
+    ctx = _get_exchange_context(uid)
+    if not ctx:
+        logger.warning("DCA v2 skip user %s: no exchange connected", uid)
         return None
 
-    try:
-        creds = secret_manager_service.get_binance_secret(uid)
-    except Exception as e:
-        logger.error("DCA v2 creds error for %s: %s", uid, e)
-        audit_service.log_dca_failed(uid, "multi", str(e))
-        return None
+    creds = ctx["creds"]
+    exchange = ctx["exchange"]
 
-    quote = config.get("quote_currency", "USDC")
+    # Déterminer la quote currency selon l'exchange
+    from app.core.constants import EXCHANGE_DEFAULT_QUOTE
+    default_quote = EXCHANGE_DEFAULT_QUOTE.get(exchange, "USDC")
+    quote = config.get("quote_currency", default_quote)
     pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
     btc_symbol = pairs["btc"]
     eth_symbol = pairs["eth"]
@@ -262,7 +312,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
 
     # ── 3. Klines (API publique) ─────────────────────
     try:
-        btc_klines = binance_service.get_daily_klines_public(btc_symbol, limit=250)
+        btc_klines = _get_klines_for_exchange(exchange, btc_symbol, limit=250)
         btc_closes = market_data_service.extract_closes_from_klines(btc_klines)
     except Exception as e:
         logger.error("DCA v2 klines error for %s: %s", uid, e)
@@ -469,7 +519,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     # Ordre BTC DCA normal
     if btc_amount > 0:
         btc_order = _place_order_safe(
-            uid, creds, btc_symbol, btc_amount, ORDER_SOURCE_SCHEDULER
+            uid, creds, btc_symbol, btc_amount, ORDER_SOURCE_SCHEDULER, exchange
         )
         if btc_order:
             orders_executed.append(btc_order)
@@ -477,7 +527,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     # Ordre ETH DCA normal
     if eth_amount > 0:
         eth_order = _place_order_safe(
-            uid, creds, eth_symbol, eth_amount, ORDER_SOURCE_SCHEDULER
+            uid, creds, eth_symbol, eth_amount, ORDER_SOURCE_SCHEDULER, exchange
         )
         if eth_order:
             orders_executed.append(eth_order)
@@ -485,7 +535,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     # Ordres crash reserve (tout en BTC)
     if crash_amount > 0:
         crash_order = _place_order_safe(
-            uid, creds, btc_symbol, crash_amount, ORDER_SOURCE_CRASH
+            uid, creds, btc_symbol, crash_amount, ORDER_SOURCE_CRASH, exchange
         )
         if crash_order:
             orders_executed.append(crash_order)
@@ -573,27 +623,23 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
 
 def _place_order_safe(
     uid: str, creds: dict, symbol: str, amount: float, source: str,
+    exchange: str = "binance",
 ) -> dict | None:
     """Place un ordre et enregistre. Retourne None en cas d'échec."""
     try:
-        order_data = binance_service.place_market_buy_order(
-            api_key=creds["api_key"],
-            api_secret=creds["api_secret"],
-            symbol=symbol,
-            quote_amount=amount,
-        )
+        order_data = _place_exchange_order(exchange, creds, symbol, amount)
         order_data["executed_at"] = _now_utc()
         order_data["source"] = source
         order_id = firestore_service.save_order(uid, order_data)
         order_data["order_id"] = order_id
         return order_data
-    except BinanceError as e:
+    except (BinanceError, ExchangeError) as e:
         logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
         audit_service.log_dca_failed(uid, symbol, e.message)
         if "NOTIONAL" in str(e.message).upper():
             user_msg = (
                 f"⚠️ Montant trop faible pour {symbol}.\n"
-                f"Binance exige un minimum de 5 € par ordre.\n\n"
+                f"Minimum de 5 € par ordre requis.\n\n"
                 f"👉 Augmentez votre montant DCA de base dans le dashboard."
             )
         else:
@@ -696,14 +742,18 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
     if not config:
         return {"error": "No v2 config found"}
 
-    quote = config.get("quote_currency", "USDC")
+    # Déterminer l'exchange actif pour les klines
+    exchange = firestore_service.get_active_exchange(uid)
+    from app.core.constants import EXCHANGE_DEFAULT_QUOTE
+    default_quote = EXCHANGE_DEFAULT_QUOTE.get(exchange, "USDC")
+    quote = config.get("quote_currency", default_quote)
     pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
     btc_symbol = pairs["btc"]
     base_amount = config.get("base_daily_amount", 12.0)
 
     # Klines
     try:
-        klines = binance_service.get_daily_klines_public(btc_symbol, limit=250)
+        klines = _get_klines_for_exchange(exchange, btc_symbol, limit=250)
         closes = market_data_service.extract_closes_from_klines(klines)
     except Exception as e:
         return {"error": f"Klines unavailable: {e}"}

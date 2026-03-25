@@ -4,7 +4,7 @@ Service Portfolio – calcul snapshots et métriques.
 
 from __future__ import annotations
 
-from app.services import firestore_service, binance_service, secret_manager_service
+from app.services import firestore_service, binance_service, revolutx_service, secret_manager_service
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -79,13 +79,20 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
     # Recalcul depuis les données corrigées pour cohérence
     avg_price = total_invested / total_qty if total_qty > 0 else 0.0
 
-    # Récupérer le prix actuel via Binance
+    # Récupérer le prix actuel via l'exchange actif
     market_price = 0.0
     try:
-        creds = secret_manager_service.get_binance_secret(uid)
-        market_price = binance_service.get_symbol_price(
-            creds["api_key"], creds["api_secret"], symbol
-        )
+        exchange = firestore_service.get_active_exchange(uid)
+        if exchange == "revolutx":
+            creds = secret_manager_service.get_revolutx_secret(uid)
+            market_price = revolutx_service.get_symbol_price(
+                creds["api_key"], creds["private_key_pem"], symbol
+            )
+        else:
+            creds = secret_manager_service.get_binance_secret(uid)
+            market_price = binance_service.get_symbol_price(
+                creds["api_key"], creds["api_secret"], symbol
+            )
     except Exception as e:
         logger.warning("Could not fetch market price for %s/%s: %s", uid, symbol, e)
 
