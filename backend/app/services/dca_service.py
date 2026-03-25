@@ -162,6 +162,26 @@ def already_executed_today(uid: str, symbol: str) -> bool:
     return order_date == today
 
 
+# Cooldown anti-doublon en secondes (évite 2 ordres si double-clic rapide)
+_ORDER_COOLDOWN_SECONDS = 120
+
+
+def _recently_executed(uid: str, symbol: str) -> bool:
+    """Vérifie si un ordre a été exécuté dans les 2 dernières minutes (anti-doublon)."""
+    latest = firestore_service.get_latest_order(uid, symbol)
+    if not latest:
+        return False
+    executed_at = latest.get("executed_at")
+    if executed_at is None:
+        return False
+    now = datetime.now(pytz.UTC)
+    if hasattr(executed_at, "timestamp"):
+        delta = (now - executed_at).total_seconds()
+    else:
+        return False
+    return delta < _ORDER_COOLDOWN_SECONDS
+
+
 # ══════════════════════════════════════════════════════
 # v1 – DCA simple (rétrocompat)
 # ══════════════════════════════════════════════════════
@@ -201,6 +221,10 @@ def execute_user_dca(uid: str) -> dict | None:
                 f"ℹ️ Achat DCA déjà exécuté aujourd'hui pour {symbol}.\n"
                 f"Cochez \"Forcer réachat\" dans le dashboard pour bypasser.",
             )
+            return None
+        # Anti-doublon : même avec force_rebuy, bloquer si ordre < 2 min
+        if _recently_executed(uid, symbol):
+            logger.info("Skipping DCA for user %s: order too recent (anti-doublon)", uid)
             return None
         logger.info("Force rebuy activated for user %s / %s", uid, symbol)
 
@@ -324,6 +348,11 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
     btc_symbol = pairs["btc"]
     eth_symbol = pairs["eth"]
     base_amount = config.get("base_daily_amount", 12.0)
+
+    # Anti-doublon : si un ordre BTC a été passé il y a < 2 min, skip
+    if _recently_executed(uid, btc_symbol):
+        logger.info("Skipping DCA v2 for user %s: order too recent (anti-doublon)", uid)
+        return None
 
     # ── 3. Klines (API publique) ─────────────────────
     try:
