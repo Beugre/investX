@@ -154,6 +154,8 @@ def place_market_buy_order(
     Utilise quote_size pour acheter avec un montant en quote currency (EUR).
     Symbol format: "BTC-EUR", "ETH-EUR", etc.
     """
+    import time as _time
+
     client_order_id = str(uuid.uuid4())
     body = {
         "client_order_id": client_order_id,
@@ -170,109 +172,124 @@ def place_market_buy_order(
         result = _request(api_key, private_key_pem, "POST", "/orders", json_body=body)
         data = result.get("data", result)
 
+        # Log complet de la réponse pour diagnostiquer les champs disponibles
+        logger.info("Revolut X POST /orders response: %s", json.dumps(data, default=str)[:500])
+
         venue_order_id = data.get("venue_order_id", client_order_id)
         state = data.get("state", "PENDING").upper()
         failure_reason = data.get("failure_reason", "") or data.get("reject_reason", "") or ""
 
-        # Vérifier si l'ordre a été rejeté/annulé par l'exchange
+        # ── Vérifier si l'ordre a été rejeté/annulé ──
         _FAILED_STATES = {"CANCELLED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"}
         if state in _FAILED_STATES:
             detail = failure_reason or ""
             logger.warning(
-                "Revolut X order %s returned state=%s reason=%s data=%s",
-                venue_order_id, state, failure_reason, data,
+                "Revolut X order %s state=%s reason=%s",
+                venue_order_id, state, failure_reason,
             )
             reason_upper = detail.upper()
-            # Détecter spécifiquement le solde insuffisant
             if any(kw in reason_upper for kw in ("INSUFFICIENT", "BALANCE", "FUNDS", "NOT_ENOUGH")):
-                raise ExchangeError(
-                    f"Revolut X : solde insuffisant – {detail}"
-                )
-            # Si CANCELLED sans raison sur un ordre market → très probablement
-            # un solde insuffisant (cause #1 d'annulation immédiate)
+                raise ExchangeError(f"Revolut X : solde insuffisant – {detail}")
             if state in ("CANCELLED", "CANCELED") and not detail:
                 raise ExchangeError(
                     "Revolut X : solde insuffisant – l'ordre a été annulé, "
                     "vérifiez que votre portefeuille Cryptos · EUR est suffisamment approvisionné"
                 )
-            raise ExchangeError(
-                f"Revolut X : ordre {state.lower()} – {detail or state}"
+            raise ExchangeError(f"Revolut X : ordre {state.lower()} – {detail or state}")
+
+        # ── Attente de remplissage : poller GET /orders/{id} ──
+        order_data = data
+        _SUCCESS_STATES = {"FILLED", "DONE", "COMPLETED"}
+        for attempt in range(8):
+            if state in _SUCCESS_STATES:
+                break
+            _time.sleep(0.75)
+            try:
+                poll_result = _request(api_key, private_key_pem, "GET", f"/orders/{venue_order_id}")
+                order_data = poll_result.get("data", poll_result)
+                state = order_data.get("state", state).upper()
+                logger.debug("Order %s poll %d: state=%s", venue_order_id, attempt + 1, state)
+                # Re-vérifier si annulé pendant le polling
+                if state in _FAILED_STATES:
+                    detail = order_data.get("failure_reason", "") or ""
+                    if not detail:
+                        raise ExchangeError(
+                            "Revolut X : solde insuffisant – l'ordre a été annulé"
+                        )
+                    raise ExchangeError(f"Revolut X : ordre {state.lower()} – {detail}")
+            except ExchangeError:
+                raise
+            except Exception as e:
+                logger.debug("Order poll %d failed: %s", attempt + 1, e)
+
+        if state not in _SUCCESS_STATES:
+            logger.warning("Revolut X order %s still state=%s after polling", venue_order_id, state)
+
+        # Log les données de l'ordre après polling
+        logger.info("Revolut X order %s final data: %s", venue_order_id, json.dumps(order_data, default=str)[:500])
+
+        # ── Extraction des données de remplissage ──
+        # Niveau 1 : champs directs de l'ordre (filled_size, average_filled_price, etc.)
+        total_qty = _extract_float(order_data, "filled_size", "filled_quantity", "executed_quantity", "base_size")
+        avg_price = _extract_float(order_data, "average_filled_price", "avg_price", "average_price", "price")
+        total_cost = _extract_float(order_data, "filled_value", "total_value", "cost", "quote_size")
+        total_commission = _extract_float(order_data, "fee", "commission", "total_fee")
+
+        # Niveau 2 : si les champs directs sont vides, essayer les fills
+        if total_qty == 0:
+            fills_data = _get_order_fills(api_key, private_key_pem, venue_order_id)
+            for fill in fills_data:
+                qty = float(fill.get("base_size", 0) or fill.get("quantity", 0))
+                price = float(fill.get("price", 0))
+                fee = float(fill.get("fee", 0))
+                total_qty += qty
+                total_cost += qty * price
+                total_commission += fee
+
+            if total_qty > 0:
+                avg_price = total_cost / total_qty
+                logger.info("Fills endpoint returned data: qty=%.8f, avg=%.2f", total_qty, avg_price)
+
+        # Recalculer avg_price à partir du coût total si manquant
+        if avg_price == 0 and total_qty > 0 and total_cost > 0:
+            avg_price = total_cost / total_qty
+
+        # Niveau 3 : estimation via le prix public si toujours vide
+        estimated = False
+        if total_qty == 0 and state in _SUCCESS_STATES:
+            estimated = True
+            logger.warning(
+                "Revolut X order %s state=%s but no fill data found – estimating",
+                venue_order_id, state,
             )
+            try:
+                avg_price = get_symbol_price_no_auth(symbol)
+            except Exception:
+                # Fallback : essayer CoinGecko ou un prix de l'order-book authentifié
+                try:
+                    avg_price = get_symbol_price(api_key, private_key_pem, symbol)
+                except Exception:
+                    avg_price = 0.0
 
-        # Récupérer les fills pour le prix moyen et la quantité
-        fills_data = _get_order_fills(api_key, private_key_pem, venue_order_id)
+            if avg_price > 0:
+                total_qty = quote_amount / avg_price
+                total_cost = quote_amount
 
-        total_qty = 0.0
-        total_cost = 0.0
-        total_commission = 0.0
-        commission_asset = ""
-
-        for fill in fills_data:
-            qty = float(fill.get("base_size", 0))
-            price = float(fill.get("price", 0))
-            fee = float(fill.get("fee", 0))
-            total_qty += qty
-            total_cost += qty * price
-            total_commission += fee
-            if not commission_asset:
-                commission_asset = fill.get("fee_currency", "")
-
-        avg_price = total_cost / total_qty if total_qty > 0 else 0.0
         actual_spent = total_cost if total_cost > 0 else quote_amount
 
         # Base asset extrait du symbol (BTC-EUR → BTC)
         base_asset = symbol.split("-")[0] if "-" in symbol else symbol
+        commission_asset = order_data.get("fee_currency", base_asset) if total_commission > 0 else ""
 
         # Quantité nette
-        if commission_asset == base_asset:
+        if commission_asset == base_asset and total_commission > 0:
             net_qty = total_qty - total_commission
         else:
             net_qty = total_qty
 
-        # Si state=FILLED/DONE mais 0 fills : l'ordre A été exécuté côté Revolut
-        # (l'argent est parti), mais l'API fills n'a pas renvoyé les détails.
-        # On retourne un succès avec des données estimées plutôt qu'une erreur.
-        if total_qty == 0:
-            _SUCCESS_STATES = {"FILLED", "DONE", "COMPLETED"}
-            if state in _SUCCESS_STATES:
-                logger.warning(
-                    "Revolut X order %s state=%s but 0 fills – returning estimated data",
-                    venue_order_id, state,
-                )
-                # Essayer de récupérer le prix courant pour estimer la quantité
-                try:
-                    est_price = get_symbol_price_no_auth(symbol)
-                    est_qty = quote_amount / est_price if est_price > 0 else 0.0
-                except Exception:
-                    est_price = 0.0
-                    est_qty = 0.0
-
-                return {
-                    "symbol": symbol,
-                    "side": "BUY",
-                    "amount_eur": quote_amount,
-                    "quantity": est_qty,
-                    "quantity_gross": est_qty,
-                    "commission": 0.0,
-                    "commission_asset": "",
-                    "price": est_price,
-                    "status": state,
-                    "exchange_order_id": venue_order_id,
-                    "estimated": True,
-                }
-            else:
-                logger.warning(
-                    "Revolut X order %s state=%s and 0 fills – treating as failed",
-                    venue_order_id, state,
-                )
-                raise ExchangeError(
-                    f"Revolut X : ordre {state.lower()}, aucun fill reçu. "
-                    f"Vérifiez votre solde Cryptos · EUR."
-                )
-
         logger.info(
-            "Revolut X market buy: symbol=%s, quote=%.2f, qty=%.8f, avg_price=%.2f",
-            symbol, quote_amount, net_qty, avg_price,
+            "Revolut X market buy: symbol=%s, quote=%.2f, qty=%.8f, avg_price=%.2f, estimated=%s",
+            symbol, quote_amount, net_qty, avg_price, estimated,
         )
 
         return {
@@ -286,12 +303,27 @@ def place_market_buy_order(
             "price": avg_price,
             "status": state,
             "exchange_order_id": venue_order_id,
+            **({"estimated": True} if estimated else {}),
         }
     except ExchangeError:
         raise
     except Exception as e:
         logger.error("Revolut X order failed: %s", e)
         raise ExchangeError(f"Order failed: {e}") from e
+
+
+def _extract_float(data: dict, *keys: str) -> float:
+    """Tente d'extraire un float depuis l'un des champs donnés."""
+    for key in keys:
+        val = data.get(key)
+        if val is not None:
+            try:
+                fval = float(val)
+                if fval > 0:
+                    return fval
+            except (ValueError, TypeError):
+                pass
+    return 0.0
 
 
 def _get_order_fills(
