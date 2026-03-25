@@ -391,9 +391,7 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
 
     if mvrv_enabled:
         try:
-            loop = asyncio.new_event_loop()
-            mvrv_value = loop.run_until_complete(market_data_service.fetch_mvrv_ratio("btc"))
-            loop.close()
+            mvrv_value = market_data_service.fetch_mvrv_ratio_sync("btc")
         except Exception as e:
             logger.warning("DCA v2 MVRV fetch failed: %s", e)
 
@@ -856,11 +854,7 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
     mvrv_mult = 1.0
     if config.get("mvrv_enabled", True):
         try:
-            loop = asyncio.new_event_loop()
-            mvrv_value = loop.run_until_complete(
-                market_data_service.fetch_mvrv_ratio("btc")
-            )
-            loop.close()
+            mvrv_value = market_data_service.fetch_mvrv_ratio_sync("btc")
         except Exception:
             pass
         mvrv_mult = market_data_service.get_mvrv_multiplier(

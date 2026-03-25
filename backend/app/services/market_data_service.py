@@ -109,44 +109,54 @@ def get_market_regime(
 # MVRV (Market Value / Realized Value) via CoinMetrics
 # ══════════════════════════════════════════════════════
 
+def _build_mvrv_url(asset: str) -> str:
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    return (
+        f"{COINMETRICS_API_URL}/timeseries/asset-metrics"
+        f"?assets={asset}"
+        f"&metrics=CapMVRVCur"
+        f"&start_time={start_date}"
+        f"&end_time={end_date}"
+        f"&frequency=1d"
+    )
+
+
+def _parse_mvrv_response(response, asset: str) -> float | None:
+    if response.status_code != 200:
+        logger.warning("CoinMetrics API error %s: %s", response.status_code, response.text)
+        return None
+    data = response.json()
+    series = data.get("data", [])
+    if not series:
+        logger.warning("No MVRV data returned from CoinMetrics")
+        return None
+    latest = series[-1]
+    mvrv = float(latest.get("CapMVRVCur", 0))
+    logger.info("MVRV ratio for %s: %.4f", asset, mvrv)
+    return mvrv
+
+
 async def fetch_mvrv_ratio(asset: str = "btc") -> float | None:
-    """Récupère le MVRV ratio du BTC depuis CoinMetrics Community API.
-    Retourne None si indisponible.
-    """
+    """Récupère le MVRV ratio (version async)."""
     try:
-        end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-
-        url = (
-            f"{COINMETRICS_API_URL}/timeseries/asset-metrics"
-            f"?assets={asset}"
-            f"&metrics=CapMVRVCur"
-            f"&start_time={start_date}"
-            f"&end_time={end_date}"
-            f"&frequency=1d"
-        )
-
+        url = _build_mvrv_url(asset)
         async with httpx.AsyncClient() as client:
             response = await client.get(url, timeout=15)
-
-        if response.status_code != 200:
-            logger.warning("CoinMetrics API error %s: %s", response.status_code, response.text)
-            return None
-
-        data = response.json()
-        series = data.get("data", [])
-        if not series:
-            logger.warning("No MVRV data returned from CoinMetrics")
-            return None
-
-        # Prendre la dernière valeur disponible
-        latest = series[-1]
-        mvrv = float(latest.get("CapMVRVCur", 0))
-        logger.info("MVRV ratio for %s: %.4f", asset, mvrv)
-        return mvrv
-
+        return _parse_mvrv_response(response, asset)
     except Exception as e:
         logger.error("Failed to fetch MVRV from CoinMetrics: %s", e)
+        return None
+
+
+def fetch_mvrv_ratio_sync(asset: str = "btc") -> float | None:
+    """Récupère le MVRV ratio (version sync – safe pour scheduler threads)."""
+    try:
+        url = _build_mvrv_url(asset)
+        response = httpx.get(url, timeout=15)
+        return _parse_mvrv_response(response, asset)
+    except Exception as e:
+        logger.error("Failed to fetch MVRV from CoinMetrics (sync): %s", e)
         return None
 
 
