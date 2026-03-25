@@ -31,6 +31,7 @@ from app.core.constants import (
     DEFAULT_REGIME_RULES,
 )
 from app.core.exceptions import BinanceError
+from firebase_admin import auth as firebase_auth
 from app.services import (
     firestore_service,
     secret_manager_service,
@@ -40,6 +41,7 @@ from app.services import (
     subscription_service,
     audit_service,
     market_data_service,
+    email_service,
 )
 from app.logger import get_logger
 
@@ -207,6 +209,9 @@ def execute_user_dca(uid: str) -> dict | None:
 
     # 11. Notification Telegram
     _send_order_telegram(uid, order_data)
+
+    # 12. Notification Email
+    _send_order_email(uid, order_data)
 
     logger.info("DCA executed successfully for user %s / %s", uid, symbol)
     return order_data
@@ -541,6 +546,12 @@ def _execute_user_dca_v2(uid: str, config: dict) -> dict | None:
         crash_amount, crash_levels_triggered, orders_executed,
     )
 
+    # ── 14. Notification Email ────────────────────────
+    _send_v2_email(
+        uid, rsi, rsi_label, regime, btc_amount, eth_amount,
+        crash_amount, crash_levels_triggered, orders_executed,
+    )
+
     # Refresh snapshots
     for sym in {btc_symbol, eth_symbol}:
         try:
@@ -852,6 +863,47 @@ def _send_error_telegram(uid: str, error_message: str) -> None:
         loop.close()
     except Exception as e:
         logger.warning("Failed to send Telegram error notification: %s", e)
+
+
+def _get_user_email(uid: str) -> str | None:
+    """Récupère l'email de l'utilisateur depuis Firebase Auth."""
+    try:
+        firebase_user = firebase_auth.get_user(uid)
+        return firebase_user.email or None
+    except Exception:
+        return None
+
+
+def _send_order_email(uid: str, order: dict) -> None:
+    """Envoie un email de confirmation d'achat DCA (fire-and-forget)."""
+    email = _get_user_email(uid)
+    if not email:
+        return
+    try:
+        email_service.send_order_email(email, order)
+    except Exception as e:
+        logger.warning("Failed to send order email to %s: %s", email, e)
+
+
+def _send_v2_email(
+    uid: str,
+    rsi: float, rsi_label: str, regime: str,
+    btc_amount: float, eth_amount: float,
+    crash_amount: float, crash_levels: list[str],
+    orders: list[dict],
+) -> None:
+    """Envoie un email récapitulatif DCA v2 (fire-and-forget)."""
+    email = _get_user_email(uid)
+    if not email:
+        return
+    try:
+        email_service.send_v2_order_email(
+            email, rsi, rsi_label, regime,
+            btc_amount, eth_amount,
+            crash_amount, crash_levels, orders,
+        )
+    except Exception as e:
+        logger.warning("Failed to send v2 email to %s: %s", email, e)
 
 
 # ══════════════════════════════════════════════════════
