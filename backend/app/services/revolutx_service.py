@@ -203,8 +203,8 @@ def place_market_buy_order(
             data = result.get("data", result)
             logger.info("Revolut X POST /orders (maker) response: %s", json.dumps(data, default=str)[:500])
 
-            venue_order_id = data.get("venue_order_id", client_order_id)
-            state = data.get("state", "PENDING").upper()
+            venue_order_id = data.get("venue_order_id", data.get("id", client_order_id))
+            state = (data.get("state") or data.get("status") or "PENDING").upper()
 
             # Vérifier rejet immédiat
             if state in _FAILED_STATES:
@@ -219,7 +219,8 @@ def place_market_buy_order(
                 try:
                     poll_result = _request(api_key, private_key_pem, "GET", f"/orders/{venue_order_id}")
                     order_data = poll_result.get("data", poll_result)
-                    state = order_data.get("state", state).upper()
+                    state = (order_data.get("state") or order_data.get("status") or state).upper()
+                    logger.debug("Maker poll %d: state=%s", poll + 1, state)
                     if state in _FAILED_STATES:
                         _handle_failed_state(order_data, venue_order_id, state)
                 except ExchangeError:
@@ -283,8 +284,8 @@ def _place_taker_order(
         data = result.get("data", result)
         logger.info("Revolut X POST /orders (taker) response: %s", json.dumps(data, default=str)[:500])
 
-        venue_order_id = data.get("venue_order_id", client_order_id)
-        state = data.get("state", "PENDING").upper()
+        venue_order_id = data.get("venue_order_id", data.get("id", client_order_id))
+        state = (data.get("state") or data.get("status") or "PENDING").upper()
 
         if state in _FAILED_STATES:
             _handle_failed_state(data, venue_order_id, state)
@@ -297,7 +298,7 @@ def _place_taker_order(
             try:
                 poll_result = _request(api_key, private_key_pem, "GET", f"/orders/{venue_order_id}")
                 order_data = poll_result.get("data", poll_result)
-                state = order_data.get("state", state).upper()
+                state = (order_data.get("state") or order_data.get("status") or state).upper()
                 if state in _FAILED_STATES:
                     _handle_failed_state(order_data, venue_order_id, state)
             except ExchangeError:
@@ -337,7 +338,7 @@ def _get_best_bid(symbol: str) -> float:
 
 def _handle_failed_state(data: dict, venue_order_id: str, state: str) -> None:
     """Lève l'exception appropriée pour un ordre en état d'échec."""
-    failure_reason = data.get("failure_reason", "") or data.get("reject_reason", "") or ""
+    failure_reason = data.get("failure_reason", "") or data.get("reject_reason", "") or data.get("reason", "") or ""
     logger.warning("Revolut X order %s state=%s reason=%s", venue_order_id, state, failure_reason)
 
     reason_upper = (failure_reason or "").upper()

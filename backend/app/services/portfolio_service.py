@@ -79,11 +79,12 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
     # Recalcul depuis les données corrigées pour cohérence
     avg_price = total_invested / total_qty if total_qty > 0 else 0.0
 
-    # Récupérer le prix actuel via l'exchange actif
+    # Récupérer le prix actuel via l'exchange approprié au symbole
+    # Les symboles Revolut X utilisent le format "BTC-EUR", Binance "BTCUSDC"
     market_price = 0.0
     try:
-        exchange = firestore_service.get_active_exchange(uid)
-        if exchange == "revolutx":
+        is_revx_symbol = "-" in symbol  # SOL-EUR, BTC-EUR, etc.
+        if is_revx_symbol:
             creds = secret_manager_service.get_revolutx_secret(uid)
             market_price = revolutx_service.get_symbol_price(
                 creds["api_key"], creds["private_key_pem"], symbol
