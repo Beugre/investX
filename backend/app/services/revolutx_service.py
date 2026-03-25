@@ -177,19 +177,26 @@ def place_market_buy_order(
         # Vérifier si l'ordre a été rejeté/annulé par l'exchange
         _FAILED_STATES = {"CANCELLED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"}
         if state in _FAILED_STATES:
-            detail = failure_reason or state
+            detail = failure_reason or ""
             logger.warning(
-                "Revolut X order %s returned state=%s reason=%s",
-                venue_order_id, state, failure_reason,
+                "Revolut X order %s returned state=%s reason=%s data=%s",
+                venue_order_id, state, failure_reason, data,
             )
-            # Détecter spécifiquement le solde insuffisant
             reason_upper = detail.upper()
+            # Détecter spécifiquement le solde insuffisant
             if any(kw in reason_upper for kw in ("INSUFFICIENT", "BALANCE", "FUNDS", "NOT_ENOUGH")):
                 raise ExchangeError(
                     f"Revolut X : solde insuffisant – {detail}"
                 )
+            # Si CANCELLED sans raison sur un ordre market → très probablement
+            # un solde insuffisant (cause #1 d'annulation immédiate)
+            if state in ("CANCELLED", "CANCELED") and not detail:
+                raise ExchangeError(
+                    "Revolut X : solde insuffisant – l'ordre a été annulé, "
+                    "vérifiez que votre portefeuille Cryptos · EUR est suffisamment approvisionné"
+                )
             raise ExchangeError(
-                f"Revolut X : ordre {state.lower()} – {detail}"
+                f"Revolut X : ordre {state.lower()} – {detail or state}"
             )
 
         # Récupérer les fills pour le prix moyen et la quantité
