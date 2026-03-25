@@ -13,8 +13,8 @@ require_auth()
 
 st.title("📖 Guide de démarrage")
 st.markdown(
-    "Suivez ces **8 étapes** pour configurer votre bot DCA crypto. "
-    "Chaque étape est détaillée ci-dessous."
+    "Suivez ces étapes pour configurer votre bot DCA crypto. "
+    "InvestX supporte **Binance** et **Revolut X** — choisissez l'exchange qui vous convient."
 )
 
 st.divider()
@@ -56,9 +56,12 @@ with st.expander("2️⃣  S'abonner (activer votre accès)", expanded=False):
 # ═══════════════════════════════════════════
 # Étape 3 – Créer un compte Binance
 # ═══════════════════════════════════════════
-with st.expander("3️⃣  Créer un compte Binance", expanded=False):
-    st.markdown(
-        """
+with st.expander("3️⃣  Créer un compte sur votre exchange", expanded=False):
+    tab_binance, tab_revolut = st.tabs(["🟡 Binance", "🔵 Revolut X"])
+
+    with tab_binance:
+        st.markdown(
+            """
 **Objectif** : ouvrir un compte sur l'exchange Binance.
 
 1. Rendez-vous sur [binance.com](https://www.binance.com/).
@@ -70,14 +73,31 @@ with st.expander("3️⃣  Créer un compte Binance", expanded=False):
 
 > ⚠️ La vérification KYC peut prendre de quelques minutes à 24h selon le volume.
 """
-    )
+        )
+
+    with tab_revolut:
+        st.markdown(
+            """
+**Objectif** : activer Revolut X dans votre app Revolut.
+
+1. Si vous n'avez pas encore Revolut, téléchargez l'app sur [revolut.com](https://www.revolut.com/) et créez un compte.
+2. Dans l'app Revolut, allez dans **Hub** → **Revolut X**.
+3. Activez Revolut X si ce n'est pas déjà fait.
+4. Votre compte est prêt ✅
+
+> 💡 Revolut X est disponible pour les utilisateurs Revolut vérifiés. Si vous avez déjà un compte Revolut, c'est immédiat.
+"""
+        )
 
 # ═══════════════════════════════════════════
 # Étape 4 – Créer une clé API Binance
 # ═══════════════════════════════════════════
-with st.expander("4️⃣  Créer une clé API Binance", expanded=False):
-    st.markdown(
-        """
+with st.expander("4️⃣  Créer une clé API", expanded=False):
+    tab_binance4, tab_revolut4 = st.tabs(["🟡 Binance", "🔵 Revolut X"])
+
+    with tab_binance4:
+        st.markdown(
+            """
 **Objectif** : permettre à InvestX d'acheter de la crypto pour vous, de façon sécurisée.
 
 1. Sur Binance, cliquez sur votre icône de profil → **Gestion des API** (ou allez sur [binance.com/en/my/settings/api-management](https://www.binance.com/en/my/settings/api-management)).
@@ -100,14 +120,40 @@ with st.expander("4️⃣  Créer une clé API Binance", expanded=False):
 >
 > 🔐 Vos clés sont chiffrées (AES-256) dans notre base de données. Nous ne pouvons ni retirer vos fonds ni accéder à votre solde sans votre autorisation.
 """
-    )
+        )
+
+    with tab_revolut4:
+        st.markdown(
+            """
+**Objectif** : permettre à InvestX d'acheter de la crypto pour vous via Revolut X.
+
+**C'est super simple, InvestX fait le plus dur pour vous !**
+
+1. Sur InvestX, allez dans **🔗 Intégrations** → section **Revolut X**.
+2. Cliquez sur **🔑 Générer mes clés Ed25519** — InvestX génère automatiquement vos clés de sécurité.
+3. **Copiez la clé publique** affichée.
+4. Allez dans **Revolut X** → **Paramètres API** → **+ Ajouter**.
+5. Donnez un nom (ex: `InvestX`), **collez la clé publique**.
+6. Cochez **"Voir mes ordres spot"** et **"Ordre spot"**.
+7. Cliquez **Enregistrer** dans Revolut X.
+8. Copiez la **Clé API** affichée par Revolut X (ex: `Syjv***590d`).
+9. Retournez sur InvestX et collez cette Clé API dans le formulaire → **Connecter**.
+
+> 💡 Pas besoin de générer de clés vous-même — InvestX s'occupe de tout !
+>
+> 🔐 Vos clés sont chiffrées (AES-256) côté serveur. Revolut X ne permet pas les retraits via API — vos fonds sont en sécurité.
+"""
+        )
 
 # ═══════════════════════════════════════════
 # Étape 5 – Recharger en USDC
 # ═══════════════════════════════════════════
-with st.expander("5️⃣  Recharger votre compte Binance en USDC", expanded=False):
-    st.markdown(
-        """
+with st.expander("5️⃣  Recharger votre compte en fonds", expanded=False):
+    tab_binance5, tab_revolut5 = st.tabs(["🟡 Binance (USDC)", "🔵 Revolut X (EUR)"])
+
+    with tab_binance5:
+        st.markdown(
+            """
 **Objectif** : déposer des fonds que le bot utilisera pour acheter de la crypto.
 
 **Option A – Dépôt par carte bancaire / virement :**
@@ -124,14 +170,32 @@ with st.expander("5️⃣  Recharger votre compte Binance en USDC", expanded=Fal
 >
 > Par exemple, si votre DCA quotidien est de 10 $, prévoyez au moins **300 USDC** pour un mois.
 """
-    )
+        )
+
+    with tab_revolut5:
+        st.markdown(
+            """
+**Objectif** : avoir des euros disponibles sur votre compte Revolut X.
+
+1. Dans l'app Revolut, assurez-vous d'avoir un **solde en EUR** sur votre compte principal.
+2. Revolut X utilise directement votre solde EUR — **aucune conversion nécessaire** !
+3. Si besoin, rechargez votre compte Revolut par **virement SEPA** ou **carte bancaire**.
+
+> 💡 Avec Revolut X, le bot achète directement en **EUR**. Pas besoin de convertir en USDC !
+>
+> Par exemple, si votre DCA quotidien est de 10 €, prévoyez au moins **300 €** pour un mois.
+"""
+        )
 
 # ═══════════════════════════════════════════
 # Étape 6 – Connecter Binance à InvestX
 # ═══════════════════════════════════════════
-with st.expander("6️⃣  Connecter Binance à InvestX", expanded=False):
-    st.markdown(
-        """
+with st.expander("6️⃣  Connecter votre exchange à InvestX", expanded=False):
+    tab_binance6, tab_revolut6 = st.tabs(["🟡 Binance", "🔵 Revolut X"])
+
+    with tab_binance6:
+        st.markdown(
+            """
 **Objectif** : renseigner vos clés API dans InvestX.
 
 1. Sur InvestX, allez dans **🔗 Intégrations** via le menu latéral.
@@ -145,7 +209,24 @@ with st.expander("6️⃣  Connecter Binance à InvestX", expanded=False):
 >
 > Si vous voyez une erreur de permissions, retournez sur Binance et vérifiez que **Spot Trading** est bien activé (étape 4).
 """
-    )
+        )
+
+    with tab_revolut6:
+        st.markdown(
+            """
+**Objectif** : connecter Revolut X à InvestX.
+
+Si vous avez suivi l'étape 4 (onglet Revolut X), vos clés sont déjà générées et configurées ! Sinon :
+
+1. Sur InvestX, allez dans **🔗 Intégrations** → section **Revolut X**.
+2. Cliquez **🔑 Générer mes clés Ed25519**.
+3. Copiez la clé publique et enregistrez-la dans Revolut X.
+4. Copiez l'API Key de Revolut X et collez-la dans le formulaire InvestX.
+5. Cliquez **Connecter** → **Connecté ✅**.
+
+> 💡 Si vous connectez les deux exchanges, vous pouvez choisir lequel utiliser via le sélecteur **"Exchange actif"** en bas de la page Intégrations.
+"""
+        )
 
 # ═══════════════════════════════════════════
 # Étape 7 – Configurer le DCA
@@ -157,8 +238,10 @@ with st.expander("7️⃣  Configurer votre DCA", expanded=False):
 
 1. Allez dans **⚙️ DCA Config** via le menu latéral.
 2. Configurez les paramètres :
-   - **Trading Pair** : la crypto à acheter (ex : `BTCUSDC`, `ETHUSDC`)
-   - **Amount** : montant en USDC à investir chaque jour (ex : `10`)
+   - **Trading Pair** : la crypto à acheter
+     - *Binance* : `BTCUSDC`, `ETHUSDC`, `SOLUSDC`, `BNBUSDC`, `ADAUSDC`
+     - *Revolut X* : `BTC-EUR`, `ETH-EUR`, `SOL-EUR`, `BNB-EUR`, `ADA-EUR`
+   - **Amount** : montant à investir chaque jour (ex : `10` en USDC pour Binance, `10` en EUR pour Revolut X)
    - **Frequency** : fréquence d'achat (`daily` = une fois par jour)
    - **Execution Time** : heure d'exécution (format UTC, ex : `14:00`)
    - **Enabled** : activez le bot ✅
@@ -171,6 +254,8 @@ with st.expander("7️⃣  Configurer votre DCA", expanded=False):
 4. Cliquez sur **Sauvegarder**.
 
 > 💡 Vous pouvez utiliser la case **Force Rebuy** pour forcer un achat immédiat (utile si vous avez changé l'heure d'exécution).
+>
+> ⚙️ Si vous changez d'exchange, pensez à mettre à jour votre **Trading Pair** (les formats sont différents entre Binance et Revolut X).
 """
     )
 

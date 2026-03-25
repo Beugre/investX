@@ -15,6 +15,8 @@ from services.api_client import (
     connect_revolutx,
     validate_revolutx,
     disconnect_revolutx,
+    get_active_exchange,
+    set_active_exchange,
     get_telegram_settings,
     link_telegram,
     test_telegram,
@@ -215,13 +217,50 @@ else:
                         except Exception as e:
                             st.error(f"❌ Erreur : {e}")
 
-# ═══════════════ INFO EXCHANGE ACTIF ════════════════
+# ═══════════════ EXCHANGE ACTIF ════════════════
 if is_connected and rx_connected:
     st.divider()
-    st.info(
-        "💡 **Deux exchanges connectés** — L'exchange actif est celui connecté en dernier. "
-        "Déconnectez l'un pour utiliser l'autre pour vos DCA."
+    st.header("⚙️ Exchange actif")
+    st.markdown(
+        "Vous avez **deux exchanges connectés**. "
+        "Choisissez lequel utiliser pour vos achats DCA :"
     )
+
+    try:
+        current_exchange = get_active_exchange(token)
+    except Exception:
+        current_exchange = "binance"
+
+    exchange_options = {
+        "binance": "🟡 Binance (USDC)",
+        "revolutx": "🔵 Revolut X (EUR)",
+    }
+    current_index = 0 if current_exchange == "binance" else 1
+
+    selected = st.radio(
+        "Exchange pour les achats DCA",
+        options=list(exchange_options.keys()),
+        format_func=lambda x: exchange_options[x],
+        index=current_index,
+        horizontal=True,
+        key="exchange_selector",
+    )
+
+    if selected != current_exchange:
+        try:
+            set_active_exchange(token, selected)
+            st.success(f"✅ Exchange actif : **{exchange_options[selected]}**")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erreur : {e}")
+    else:
+        st.info(f"🟢 Exchange actif : **{exchange_options[current_exchange]}**")
+elif is_connected:
+    st.divider()
+    st.info("🟢 Exchange actif : **🟡 Binance (USDC)**")
+elif rx_connected:
+    st.divider()
+    st.info("🟢 Exchange actif : **🔵 Revolut X (EUR)**")
 
 st.divider()
 
