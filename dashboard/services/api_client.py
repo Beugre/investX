@@ -128,7 +128,14 @@ def disable_dca_v2(token: str) -> dict:
 
 
 def force_execute_dca_v2(token: str) -> dict:
-    return _post("/dca/v2/force-execute", token)
+    """Timeout long : le maker order peut prendre 30s+ pour se remplir."""
+    r = requests.post(
+        f"{API_BASE_URL}/dca/v2/force-execute",
+        headers=_headers(token),
+        timeout=90,
+    )
+    r.raise_for_status()
+    return r.json()
 
 
 def get_dca_v2_status(token: str) -> dict:
