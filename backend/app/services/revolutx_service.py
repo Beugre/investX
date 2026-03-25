@@ -186,12 +186,10 @@ def place_market_buy_order(
                 "client_order_id": client_order_id,
                 "symbol": symbol,
                 "side": "BUY",
-                "order_configuration": {
-                    "limit": {
-                        "base_size": str(round(base_qty, 8)),
-                        "limit_price": str(round(best_bid, 8)),
-                    }
-                },
+                "type": "limit",
+                "quantity": str(round(base_qty, 8)),
+                "price": str(round(best_bid, 8)),
+                "time_in_force": "GTC",
             }
 
             logger.info(
