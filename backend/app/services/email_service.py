@@ -61,13 +61,28 @@ def send_order_email(to: str, order: dict) -> bool:
     amount = order.get("amount_eur", 0)
     quantity = order.get("quantity", 0)
     price = order.get("price", 0)
-    fees = order.get("fees_usd", 0)
+    fees = order.get("commission", order.get("fees_usd", 0))
     status = order.get("status", "?")
+    order_type = order.get("order_type", "market")
+    estimated = order.get("estimated", False)
     now = datetime.now(pytz.timezone("Europe/Paris")).strftime("%d %B %Y %H:%M GMT")
 
-    # Extraire la base currency (ex: BTCUSDC → BTC)
-    base = symbol.replace("USDC", "").replace("USDT", "").replace("EUR", "")
-    pair_display = f"{base}-USDC"
+    # Déterminer devise et pair display selon le format du symbole
+    is_eur = "-EUR" in symbol
+    cs = "€" if is_eur else "$"
+    currency_name = "EUR" if is_eur else "USD"
+
+    # Extraire la base currency
+    if "-" in symbol:
+        base = symbol.split("-")[0]
+        pair_display = symbol
+    else:
+        base = symbol.replace("USDC", "").replace("USDT", "").replace("EUR", "")
+        pair_display = f"{base}-USDC"
+
+    # Type d'ordre affiché
+    type_label = "Maker · Achat (0 % frais)" if order_type == "maker" else "Taker · Achat"
+    est_label = " (estimé)" if estimated else ""
 
     subject = f"Ordre d'achat de {pair_display} exécuté"
 
@@ -75,13 +90,13 @@ def send_order_email(to: str, order: dict) -> bool:
         f"InvestX\n\n"
         f"Ordre d'achat de {pair_display} exécuté\n\n"
         f"Votre ordre d'achat de {quantity:.8f} {base} au prix de "
-        f"{price:,.2f} $US a été exécuté.\n\n"
+        f"{price:,.2f} {cs} a été exécuté.\n\n"
         f"Date d'exécution : {now}\n"
-        f"Type : Market · Achat\n"
-        f"Prix d'exécution moyen : {price:,.2f} $US\n"
-        f"Quantité exécutée : {quantity:.8f} {base}\n"
-        f"Frais : {fees:.4f} $\n"
-        f"Valeur exécutée : {amount:.2f} $US\n"
+        f"Type : {type_label}\n"
+        f"Prix d'exécution moyen : {price:,.2f} {cs}{est_label}\n"
+        f"Quantité exécutée : {quantity:.8f} {base}{est_label}\n"
+        f"Frais : {fees:.4f} {cs}\n"
+        f"Valeur exécutée : {amount:.2f} {cs}\n"
         f"Montant reçu : {quantity:.8f} {base}\n\n"
         f"Voir sur InvestX : https://investxbot.com/Dashboard"
     )
@@ -107,7 +122,7 @@ def send_order_email(to: str, order: dict) -> bool:
   <!-- Subtitle -->
   <tr><td style="padding:16px 40px 0;text-align:center;">
     <p style="margin:0;font-size:15px;color:#666;line-height:1.5;">
-      Votre ordre d'achat de {quantity:.8f} {base} au prix de<br>{price:,.2f} $US a été exécuté.
+      Votre ordre d'achat de {quantity:.8f} {base} au prix de<br>{price:,.2f} {cs} a été exécuté.
     </p>
   </td></tr>
 
@@ -120,23 +135,23 @@ def send_order_email(to: str, order: dict) -> bool:
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Type</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">Market · Achat</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{type_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Prix d'exécution moyen</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{price:,.2f} $US</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{price:,.2f} {cs}{est_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Quantité exécutée</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{quantity:.8f} {base}</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{quantity:.8f} {base}{est_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Frais</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{fees:.4f} $</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{fees:.4f} {cs}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Valeur exécutée</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{amount:.2f} $US</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{amount:.2f} {cs}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;">Montant reçu</td>
@@ -170,45 +185,62 @@ def send_v2_order_email(
     now = datetime.now(pytz.timezone("Europe/Paris")).strftime("%d %B %Y %H:%M GMT")
     total = btc_amount + eth_amount + crash_amount
 
+    # Détecter devise à partir des ordres
+    any_eur = any("EUR" in o.get("symbol", "") for o in orders)
+    cs = "€" if any_eur else "$"
+    currency_name = "EUR" if any_eur else "USD"
+
     # Build order rows
     orders_rows = ""
     plain_orders = ""
     for o in orders:
         sym = o.get("symbol", "?")
-        base = sym.replace("USDC", "").replace("USDT", "").replace("EUR", "")
-        pair = f"{base}-USDC"
+        is_eur = "-EUR" in sym
+        o_cs = "€" if is_eur else "$"
+
+        if "-" in sym:
+            base = sym.split("-")[0]
+            pair = sym
+        else:
+            base = sym.replace("USDC", "").replace("USDT", "").replace("EUR", "")
+            pair = f"{base}-USDC"
+
         qty = o.get("quantity", 0)
         px = o.get("price", 0)
         amt = o.get("amount_eur", 0)
-        fees = o.get("fees_usd", 0)
+        fees = o.get("commission", o.get("fees_usd", 0))
+        order_type = o.get("order_type", "market")
+        estimated = o.get("estimated", False)
+        type_label = "Maker (0 %)" if order_type == "maker" else "Taker"
+        est_label = " (estimé)" if estimated else ""
 
         orders_rows += f"""
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Paire</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{pair}</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{pair} · {type_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Prix d'exécution moyen</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{px:,.2f} $US</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{px:,.2f} {o_cs}{est_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Quantité exécutée</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{qty:.8f} {base}</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{qty:.8f} {base}{est_label}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Frais</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{fees:.4f} $</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{fees:.4f} {o_cs}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Valeur exécutée</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{amt:.2f} $US</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{amt:.2f} {o_cs}</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #e8e8e8;">Montant reçu</td>
         <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #e8e8e8;">{qty:.8f} {base}</td>
       </tr>
 """
-        plain_orders += f"  {pair}: {qty:.8f} @ {px:,.2f} $US = {amt:.2f} $US\n"
+        plain_orders += f"  {pair} ({type_label}): {qty:.8f} @ {px:,.2f} {o_cs} = {amt:.2f} {o_cs}\n"
 
     crash_row = ""
     crash_plain = ""
@@ -216,19 +248,19 @@ def send_v2_order_email(
         crash_row = f"""
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#e53935;font-weight:600;border-bottom:1px solid #f0f0f0;">Crash Reserve</td>
-        <td style="padding:14px 16px;font-size:14px;color:#e53935;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{crash_amount:.2f} $US ({', '.join(crash_levels)})</td>
+        <td style="padding:14px 16px;font-size:14px;color:#e53935;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">{crash_amount:.2f} {cs} ({', '.join(crash_levels)})</td>
       </tr>
 """
-        crash_plain = f"  Crash Reserve: {crash_amount:.2f} $US ({', '.join(crash_levels)})\n"
+        crash_plain = f"  Crash Reserve: {crash_amount:.2f} {cs} ({', '.join(crash_levels)})\n"
 
-    subject = f"Ordres DCA RSI v2 exécutés – {total:.2f} $US"
+    subject = f"Ordres DCA RSI v2 exécutés – {total:.2f} {cs}"
 
     plain = (
         f"InvestX\n\n"
         f"Ordres DCA RSI v2 exécutés\n\n"
         f"RSI : {rsi:.1f} ({rsi_label}) | Régime : {regime}\n\n"
         f"Ordres :\n{plain_orders}{crash_plain}"
-        f"\nTotal investi : {total:.2f} $US\n"
+        f"\nTotal investi : {total:.2f} {cs}\n"
         f"Date : {now}\n\n"
         f"Voir sur InvestX : https://investxbot.com/Dashboard"
     )
@@ -255,7 +287,7 @@ def send_v2_order_email(
   <tr><td style="padding:16px 40px 0;text-align:center;">
     <p style="margin:0;font-size:15px;color:#666;line-height:1.5;">
       RSI : {rsi:.1f} ({rsi_label}) · Régime : {regime}<br>
-      Total investi : <strong>{total:.2f} $US</strong>
+      Total investi : <strong>{total:.2f} {cs}</strong>
     </p>
   </td></tr>
 
@@ -278,7 +310,7 @@ def send_v2_order_email(
       {crash_row}
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:700;">Total investi</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:700;text-align:right;">{total:.2f} $US</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:700;text-align:right;">{total:.2f} {cs}</td>
       </tr>
     </table>
   </td></tr>
