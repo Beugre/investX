@@ -1,5 +1,5 @@
 """
-Service Email – envoi de notifications par email (SMTP SSL).
+Service Email – envoi de notifications par email (Brevo SMTP relay).
 """
 
 from __future__ import annotations
@@ -17,23 +17,15 @@ from app.logger import get_logger
 
 logger = get_logger(__name__)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "mail.investxbot.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
-SMTP_USER = os.getenv("SMTP_USER", "contact@investxbot.com")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "InvestX <contact@investxbot.com>")
 
 
-def _get_ssl_context() -> ssl.SSLContext:
-    """Crée un contexte SSL permissif pour les hébergeurs mutualisés (LWS)."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
 def _send_email(to: str, subject: str, html_body: str, plain_body: str = "") -> bool:
-    """Envoie un email via SMTP SSL. Retourne True si succès."""
+    """Envoie un email via Brevo SMTP (STARTTLS 587). Retourne True si succès."""
     if not SMTP_PASSWORD:
         logger.warning("SMTP_PASSWORD not configured, skipping email")
         return False
@@ -43,7 +35,7 @@ def _send_email(to: str, subject: str, html_body: str, plain_body: str = "") -> 
         msg["Subject"] = subject
         msg["From"] = SMTP_FROM
         msg["To"] = to
-        msg["Reply-To"] = SMTP_USER
+        msg["Reply-To"] = "contact@investxbot.com"
 
         # Texte brut (fallback + meilleure délivrabilité)
         if plain_body:
@@ -51,10 +43,10 @@ def _send_email(to: str, subject: str, html_body: str, plain_body: str = "") -> 
         # HTML
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        ctx = _get_ssl_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15, context=ctx) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, to, msg.as_string())
+            server.sendmail(SMTP_FROM, to, msg.as_string())
 
         logger.info("Email sent to %s: %s", to, subject)
         return True
