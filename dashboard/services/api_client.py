@@ -64,6 +64,14 @@ def get_me(token: str) -> dict:
     return _get("/me", token)
 
 
+def get_user_profile(token: str) -> dict:
+    return _get("/me/profile", token)
+
+
+def update_user_profile(token: str, data: dict) -> dict:
+    return _put("/me/profile", token, json=data)
+
+
 def init_onboarding(token: str) -> dict:
     return _post("/onboarding/init", token)
 

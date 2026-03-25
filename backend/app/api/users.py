@@ -9,6 +9,7 @@ from firebase_admin import auth as firebase_auth
 
 from app.core.auth_firebase import get_current_uid
 from app.core.exceptions import NotFound
+from pydantic import BaseModel
 from app.schemas.user import UserProfile, OnboardingResponse
 from app.services import firestore_service
 
@@ -57,4 +58,32 @@ async def get_profile(uid: str = Depends(get_current_uid)):
     user = firestore_service.get_user(uid)
     if not user:
         raise NotFound("User profile not found")
+    return UserProfile(**user)
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = None
+    timezone: str | None = None
+
+
+@router.put("/me/profile", response_model=UserProfile)
+async def update_profile(
+    body: UpdateProfileRequest,
+    uid: str = Depends(get_current_uid),
+):
+    """Met à jour le profil utilisateur (display_name, timezone)."""
+    user = firestore_service.get_user(uid)
+    if not user:
+        raise NotFound("User profile not found")
+
+    updates = {}
+    if body.display_name is not None:
+        updates["display_name"] = body.display_name
+    if body.timezone is not None:
+        updates["timezone"] = body.timezone
+
+    if updates:
+        firestore_service.update_user(uid, updates)
+
+    user = firestore_service.get_user(uid)
     return UserProfile(**user)

@@ -6,13 +6,19 @@ Après connexion : accueil personnalisé + barre de progression onboarding.
 """
 
 import streamlit as st
-from services.auth_client import sign_in_with_email_password, sign_up_with_email_password
+from services.auth_client import (
+    sign_in_with_email_password,
+    sign_up_with_email_password,
+    send_password_reset_email,
+)
 from services.api_client import (
     init_onboarding,
     get_subscription_status,
     get_binance_status,
     get_telegram_settings,
     get_dca_config,
+    get_user_profile,
+    update_user_profile,
 )
 from services.session_manager import try_restore_session, save_session, clear_session
 
@@ -107,8 +113,23 @@ def _landing_page():
                 except Exception as e:
                     st.error(f"❌ Erreur : {e}")
 
+        # ── Mot de passe oublié ──
+        with st.expander("🔑 Mot de passe oublié ?"):
+            reset_email = st.text_input("Entrez votre email", key="reset_email")
+            if st.button("Envoyer le lien de réinitialisation"):
+                if not reset_email:
+                    st.warning("Veuillez saisir votre email.")
+                else:
+                    try:
+                        send_password_reset_email(reset_email)
+                        st.success("📧 Un email de réinitialisation a été envoyé ! Vérifiez votre boîte de réception.")
+                    except Exception as e:
+                        st.error(f"❌ Erreur : {e}")
+
     with tab_signup:
         with st.form("signup_form"):
+            first_name = st.text_input("Prénom", key="signup_first_name")
+            last_name = st.text_input("Nom", key="signup_last_name")
             email = st.text_input("Email", key="signup_email")
             password = st.text_input("Mot de passe", type="password", key="signup_pwd")
             password2 = st.text_input(
@@ -117,7 +138,9 @@ def _landing_page():
             submitted = st.form_submit_button("Créer un compte")
 
             if submitted:
-                if password != password2:
+                if not first_name or not last_name:
+                    st.error("Le prénom et le nom sont obligatoires.")
+                elif password != password2:
                     st.error("Les mots de passe ne correspondent pas.")
                 elif len(password) < 6:
                     st.error("Le mot de passe doit contenir au moins 6 caractères.")
@@ -137,6 +160,16 @@ def _landing_page():
                         except Exception:
                             pass
 
+                        # Enregistrer le display_name
+                        display_name = f"{first_name} {last_name}".strip()
+                        try:
+                            update_user_profile(
+                                result["idToken"],
+                                {"display_name": display_name},
+                            )
+                        except Exception:
+                            pass
+
                         st.success("✅ Compte créé et connecté !")
                         st.rerun()
                     except Exception as e:
@@ -152,11 +185,21 @@ def _logged_in_home():
     token = st.session_state.get("token", "")
     email = st.session_state.get("email", "")
 
+    # Récupérer le display_name depuis le profil
+    display_name = ""
+    try:
+        profile = get_user_profile(token)
+        display_name = profile.get("display_name") or ""
+    except Exception:
+        pass
+
+    greeting = display_name if display_name else email
+
     st.markdown(
         f"""
         <div style="text-align:center; padding: 0.5rem 0 1rem 0;">
             <h1 style="font-size:2.4rem; margin-bottom:0.2rem;">📈 InvestX</h1>
-            <p style="color:#888;">Bienvenue, <strong>{email}</strong></p>
+            <p style="font-size:1.3rem;">Bonjour {greeting} 👋</p>
         </div>
         """,
         unsafe_allow_html=True,

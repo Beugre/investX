@@ -50,6 +50,20 @@ def sign_up_with_email_password(email: str, password: str) -> dict:
     return data
 
 
+def send_password_reset_email(email: str) -> None:
+    """Envoie un email de réinitialisation de mot de passe via Firebase Auth."""
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}"
+    payload = {
+        "requestType": "PASSWORD_RESET",
+        "email": email,
+    }
+    response = requests.post(url, json=payload, timeout=10)
+    data = response.json()
+    if response.status_code != 200:
+        error_msg = data.get("error", {}).get("message", "Password reset failed")
+        raise Exception(error_msg)
+
+
 def refresh_token(refresh_token_str: str) -> dict:
     """Rafraîchit le token Firebase."""
     url = f"https://securetoken.googleapis.com/v1/token?key={FIREBASE_API_KEY}"
