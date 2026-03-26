@@ -34,7 +34,7 @@ Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et
 l'utilisation du service InvestX, accessible à l'adresse **investxbot.com**.
 
 InvestX est un outil d'automatisation d'achats récurrents de cryptomonnaies
-(DCA – Dollar-Cost Averaging) via l'API Binance.
+(DCA – Dollar-Cost Averaging) via les API de Binance et Revolut X.
 
 ### 2. Éditeur du service
 
@@ -54,7 +54,7 @@ InvestX est un outil d'automatisation d'achats récurrents de cryptomonnaies
 
 InvestX fournit :
 - Un tableau de bord pour configurer et suivre des achats DCA automatisés
-- La connexion à un compte Binance via clés API (lecture + trading Spot uniquement)
+- La connexion à un compte exchange (Binance ou Revolut X) via clés API (trading Spot uniquement)
 - Des notifications Telegram optionnelles
 - Un suivi de performance (PnL, historique, graphiques)
 
@@ -77,7 +77,7 @@ InvestX fournit :
 
 ### 7. Sécurité des clés API
 
-- Les clés API Binance sont chiffrées (AES-256 / Fernet) et stockées de
+- Les clés API (Binance / Revolut X) sont chiffrées (AES-256 / Fernet) et stockées de
   manière sécurisée.
 - InvestX ne demande jamais l'activation des retraits sur les clés API.
 - L'utilisateur est responsable de la configuration correcte des permissions
@@ -123,7 +123,7 @@ with tab_privacy:
 |--------|----------|-------------|
 | Email | Authentification, communication | Contrat |
 | Nom, prénom | Personnalisation de l'interface | Contrat |
-| Clés API Binance (chiffrées) | Exécution des ordres DCA | Contrat |
+| Clés API exchange (Binance / Revolut X, chiffrées) | Exécution des ordres DCA | Contrat |
 | Chat ID Telegram | Notifications | Consentement |
 | Historique des ordres | Suivi de performance | Contrat |
 | Adresse IP | Sécurité, rate limiting | Intérêt légitime |
@@ -132,7 +132,7 @@ with tab_privacy:
 
 - Les données sont stockées sur **Google Cloud Firestore** (UE) et un serveur
   **Contabo** (Allemagne).
-- Les clés API Binance sont chiffrées avec **AES-256 (Fernet)**.
+- Les clés API (Binance / Revolut X) sont chiffrées avec **AES-256 (Fernet)**.
 - Les mots de passe sont gérés par **Firebase Authentication** (hachage bcrypt).
 - L'accès aux données est restreint et journalisé.
 
@@ -168,11 +168,12 @@ Aucun cookie publicitaire ou de tracking n'est utilisé.
 | Stripe | Paiements | UE/US |
 | Telegram | Notifications | International |
 | Binance | Exécution des ordres | International |
+| Revolut X | Exécution des ordres | UE |
 
 ### 8. Transferts hors UE
 
-Certaines données peuvent être transférées vers Stripe (US) et Binance
-(international). Ces transferts sont encadrés par les clauses contractuelles
+Certaines données peuvent être transférées vers Stripe (US), Binance
+(international) et Revolut X (UE). Ces transferts sont encadrés par les clauses contractuelles
 types de la Commission européenne.
 
 ### 9. Contact DPO

@@ -402,7 +402,7 @@ def send_welcome_email(to: str, display_name: str = "") -> bool:
         f"Avec InvestX, automatisez vos investissements crypto grâce au DCA\n"
         f"(Dollar Cost Averaging) intelligent piloté par RSI.\n\n"
         f"Prochaines étapes :\n"
-        f"1. Connectez vos clés API Binance\n"
+        f"1. Connectez votre exchange (Binance ou Revolut X)\n"
         f"2. Configurez votre stratégie DCA\n"
         f"3. Activez le bot et laissez-le travailler !\n\n"
         f"Accéder au dashboard : https://investxbot.com/Dashboard\n\n"
@@ -440,7 +440,7 @@ def send_welcome_email(to: str, display_name: str = "") -> bool:
     <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;">
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Étape 1</td>
-        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">Connectez vos clés API Binance</td>
+        <td style="padding:14px 16px;font-size:14px;color:#1a1a2e;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">Connectez votre exchange (Binance ou Revolut X)</td>
       </tr>
       <tr>
         <td style="padding:14px 16px;font-size:14px;color:#888;border-bottom:1px solid #f0f0f0;">Étape 2</td>

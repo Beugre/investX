@@ -78,14 +78,18 @@ with st.expander("3️⃣  Créer un compte sur votre exchange", expanded=False)
     with tab_revolut:
         st.markdown(
             """
-**Objectif** : activer Revolut X dans votre app Revolut.
+**Objectif** : activer Revolut X pour trader des cryptos.
 
 1. Si vous n'avez pas encore Revolut, téléchargez l'app sur [revolut.com](https://www.revolut.com/) et créez un compte.
-2. Dans l'app Revolut, allez dans **Hub** → **Revolut X**.
-3. Activez Revolut X si ce n'est pas déjà fait.
+2. **Téléchargez l'app Revolut X** :
+   - 📱 [App Store (iOS)](https://apps.apple.com/app/revolut-x/id6504628674)
+   - 📱 [Google Play (Android)](https://play.google.com/store/apps/details?id=com.revolut.exchange)
+   - 💻 Ou accédez à [x.revolut.com](https://x.revolut.com) depuis un navigateur
+3. Connectez-vous avec votre compte Revolut existant.
 4. Votre compte est prêt ✅
 
-> 💡 Revolut X est disponible pour les utilisateurs Revolut vérifiés. Si vous avez déjà un compte Revolut, c'est immédiat.
+> 💡 Revolut X est l'application de trading dédiée de Revolut. Elle est **séparée** de l'app Revolut principale.
+> Si vous avez déjà un compte Revolut vérifié, l'activation est immédiate.
 """
         )
 

@@ -257,7 +257,7 @@ if is_connected and rx_connected:
         st.info(f"🟢 Exchange actif : **{exchange_options[current_exchange]}**")
 elif is_connected:
     st.divider()
-    st.info("🟢 Exchange actif : **🟡 Binance (USDC)**")
+    st.info(f"🟢 Exchange actif : **🟡 Binance (USDC)**")
 elif rx_connected:
     st.divider()
     st.info("🟢 Exchange actif : **🔵 Revolut X (EUR)**")

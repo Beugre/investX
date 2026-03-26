@@ -87,7 +87,7 @@ def _landing_page():
     st.markdown("### 🚀 Comment ça marche ?")
     steps = [
         ("1️⃣", "Créez votre compte InvestX"),
-        ("2️⃣", "Connectez votre compte Binance via API"),
+        ("2️⃣", "Connectez Binance ou Revolut X via API"),
         ("3️⃣", "Choisissez votre montant quotidien"),
         ("4️⃣", "Le bot achète pour vous chaque jour"),
     ]

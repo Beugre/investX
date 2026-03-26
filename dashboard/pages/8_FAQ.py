@@ -34,33 +34,37 @@ le long terme.
 """
     )
 
-with st.expander("Pourquoi USDC et pas EUR ?"):
+with st.expander("Pourquoi USDC sur Binance et EUR sur Revolut X ?"):
     st.markdown(
         """
-**USDC** est un stablecoin indexé 1:1 sur le dollar américain. On l'utilise car :
+InvestX supporte deux exchanges avec des devises différentes :
 
+**🟡 Binance – USDC** :
 - **Liquidité** : Les paires USDC sur Binance ont la meilleure liquidité
 - **Frais réduits** : Moins de spread et de slippage
-- **Disponibilité** : Plus de paires de trading disponibles
-- **Stabilité** : Contrairement aux paires EUR qui ont parfois des problèmes de liquidité
+- Vous convertissez vos EUR en USDC avant de commencer le DCA
 
-Vous convertissez simplement vos EUR en USDC avant de commencer le DCA.
+**🔵 Revolut X – EUR** :
+- **Simplicité** : Achetez directement en euros
+- **0% de frais** sur les ordres maker
+- Transfert instantané depuis votre compte Revolut
 """
     )
 
 with st.expander("Combien dois-je investir ?"):
     st.markdown(
         """
-Il n'y a **pas de montant minimum** imposé par InvestX. Binance a un minimum
-d'environ **5 USDC** par ordre.
+Il n'y a **pas de montant minimum** imposé par InvestX.
+- **Binance** : minimum d'environ **5 USDC** par ordre.
+- **Revolut X** : minimum d'environ **1 EUR** par ordre.
 
 **Recommandations :**
 - Investissez uniquement de l'argent que vous pouvez vous permettre de perdre
-- Commencez petit (5-20 $/jour) et augmentez progressivement
-- Prévoyez un solde USDC suffisant pour au moins 1 mois
+- Commencez petit (5-20 €/jour) et augmentez progressivement
+- Prévoyez un solde suffisant pour au moins 1 mois
 
-Exemple : Si votre DCA quotidien est de 10 $, gardez au minimum **300 USDC** sur
-votre compte Binance.
+Exemple : Si votre DCA quotidien est de 10 €, gardez au minimum **300 €/USDC** sur
+votre compte exchange.
 """
     )
 
@@ -74,14 +78,14 @@ with st.expander("Mes fonds sont-ils en sécurité ?"):
         """
 **Oui.** Voici comment nous protégeons vos fonds :
 
-1. **Vos cryptos restent sur Binance** – InvestX n'a jamais accès à vos fonds
-   directement. Tout reste sur votre compte Binance.
+1. **Vos cryptos restent sur votre exchange** (Binance ou Revolut X) – InvestX n'a
+   jamais accès à vos fonds directement.
 
-2. **Clés API limitées** – L'API Binance que vous connectez n'a que le droit
-   d'**acheter** (Spot Trading). Le retrait est **désactivé**.
+2. **Clés API limitées** :
+   - *Binance* : seul le Spot Trading est activé, les retraits sont **désactivés**.
+   - *Revolut X* : seuls les ordres spot sont autorisés, les retraits via API sont **impossibles**.
 
-3. **Restriction IP** – Votre clé API est restreinte à l'IP du serveur InvestX.
-   Personne d'autre ne peut l'utiliser.
+3. **Restriction IP** (Binance) – Votre clé API est restreinte à l'IP du serveur InvestX.
 
 4. **Chiffrement AES-256** – Vos clés API sont chiffrées dans notre base de données
    avec l'algorithme Fernet (AES-256). Elles ne sont jamais lisibles en clair.
@@ -94,22 +98,25 @@ with st.expander("Mes fonds sont-ils en sécurité ?"):
 with st.expander("Que se passe-t-il si InvestX ferme ?"):
     st.markdown(
         """
-**Rien ne change pour vos cryptos.** Elles sont sur votre compte Binance.
+**Rien ne change pour vos cryptos.** Elles restent sur votre exchange (Binance ou Revolut X).
 
-- Supprimez simplement la clé API InvestX depuis votre compte Binance
+- Supprimez simplement la clé API InvestX depuis votre exchange
 - Vos achats DCA s'arrêteront automatiquement
-- Vos cryptos restent disponibles sur Binance
+- Vos cryptos restent disponibles sur votre compte
 """
     )
 
 with st.expander("InvestX peut-il retirer mes fonds ?"):
     st.markdown(
         """
-**Non, impossible.** Lors de la configuration de votre clé API Binance :
+**Non, impossible.**
 
+**🟡 Binance** : Lors de la configuration de la clé API :
 - ❌ Le retrait (**Enable Withdrawals**) n'est **pas activé**
 - ✅ Seul le trading Spot est autorisé
 - 🔒 L'IP est restreinte au serveur InvestX
+
+**🔵 Revolut X** : L'API Revolut X ne permet **aucun retrait** — seuls les ordres spot sont possibles.
 
 Même en cas de compromission de nos serveurs, vos fonds sont protégés.
 """
@@ -172,9 +179,9 @@ with st.expander("Pourquoi mon DCA n'a pas été exécuté ?"):
         """
 Causes possibles :
 
-1. **Solde USDC insuffisant** – Vérifiez votre solde sur Binance
-2. **Montant trop faible** – Minimum ~5 USDC par ordre
-3. **Binance déconnecté** – Vérifiez la page Intégrations
+1. **Solde insuffisant** – Vérifiez votre solde sur votre exchange (USDC sur Binance, EUR sur Revolut X)
+2. **Montant trop faible** – Minimum ~5 USDC (Binance) ou ~1 EUR (Revolut X)
+3. **Exchange déconnecté** – Vérifiez la page Intégrations
 4. **Abonnement inactif** – Vérifiez la page Subscription
 5. **Heure non atteinte** – Le bot exécute à l'heure configurée (UTC)
 6. **Déjà exécuté aujourd'hui** – Un seul achat/jour. Utilisez Force Rebuy.
