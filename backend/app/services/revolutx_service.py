@@ -519,8 +519,9 @@ def get_asset_balances(
     """Retourne les balances des assets."""
     try:
         result = _request(api_key, private_key_pem, "GET", "/balances")
+        items = result if isinstance(result, list) else result.get("data", []) if isinstance(result, dict) else []
         balances = {}
-        for item in result.get("data", []):
+        for item in items:
             asset = item.get("currency", "")
             available = float(item.get("available", 0))
             if (assets is None or asset in assets) and available > 0:

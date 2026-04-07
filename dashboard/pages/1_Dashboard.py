@@ -27,6 +27,7 @@ from services.api_client import (
     get_binance_status,
     get_revolutx_status,
     get_active_exchange,
+    get_exchange_balance,
 )
 
 st.set_page_config(page_title="Dashboard – InvestX", page_icon="📊", layout="wide")
@@ -81,6 +82,18 @@ if v2_active:
             mvrv = v2_status.get("mvrv")
             c3.metric("MVRV", f"{mvrv:.2f}" if mvrv else "N/A")
             c4.metric("Montant prévu", f"{active_cs}{v2_status.get('raw_amount', 0):.2f}")
+
+            # ── Balance exchange ──
+            try:
+                bal_data = get_exchange_balance(token)
+                balances = bal_data.get("balances", {})
+                if balances:
+                    bal_cols = st.columns(len(balances))
+                    for i, (asset, amount) in enumerate(balances.items()):
+                        sym = "€" if asset == "EUR" else "$" if asset == "USDC" else ""
+                        bal_cols[i].metric(f"💰 Balance {asset}", f"{sym}{amount:,.2f}")
+            except Exception:
+                pass
         else:
             st.info(v2_status["error"])
     except Exception as e:
