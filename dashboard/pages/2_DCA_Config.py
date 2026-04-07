@@ -628,13 +628,12 @@ with st.expander("📊 Indicateurs en temps réel", expanded=True):
                     bal_cols = st.columns(len(balances))
                     for i, (asset, amount) in enumerate(balances.items()):
                         sym = "€" if asset == "EUR" else "$" if asset == "USDC" else ""
-                        bal_cols[i].metric(f"Balance {asset}", f"{sym}{amount:,.2f}")
-                elif bal_data.get("error"):
-                    st.caption(f"⚠️ Balance indisponible : {bal_data['error']}")
+                        bal_cols[i].metric(f"💰 Balance {asset}", f"{sym}{amount:,.2f}")
                 else:
-                    st.caption("Aucune balance EUR/USDC trouvée")
+                    err = bal_data.get("error", "Aucun solde EUR/USDC trouvé")
+                    st.warning(f"Balance : {err}")
             except Exception as e:
-                st.caption(f"⚠️ Erreur balance : {e}")
+                st.warning(f"Balance indisponible : {e}")
 
             st.divider()
             col_a, col_b = st.columns(2)
