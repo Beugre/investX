@@ -19,6 +19,9 @@ REVOLUTX_SYMBOLS: Final[list[str]] = [
     "BNB-EUR",
     "ADA-EUR",
     "SOL-EUR",
+    "BTC-USDC",
+    "ETH-USDC",
+    "SOL-USDC",
 ]
 
 ALLOWED_SYMBOLS: Final[list[str]] = BINANCE_SYMBOLS + REVOLUTX_SYMBOLS
@@ -34,6 +37,12 @@ DCA_V2_ETH_SYMBOLS: Final[list[str]] = ["ETHUSDC", "ETH-EUR"]
 DCA_V2_VALID_PAIRS: Final[dict[str, dict[str, str]]] = {
     "USDC": {"btc": "BTCUSDC", "eth": "ETHUSDC"},
     "EUR":  {"btc": "BTC-EUR", "eth": "ETH-EUR"},
+}
+
+# ── Paires DCA v2 disponibles par exchange (pour multi-paires) ──
+DCA_V2_ALL_SYMBOLS: Final[dict[str, list[str]]] = {
+    EXCHANGE_BINANCE:  ["BTCUSDC", "ETHUSDC", "SOLUSDC"],
+    EXCHANGE_REVOLUTX: ["BTC-EUR", "ETH-EUR", "SOL-EUR", "BTC-USDC", "ETH-USDC", "SOL-USDC"],
 }
 
 # ── Exchanges supportés ──

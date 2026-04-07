@@ -91,7 +91,8 @@ users/{uid}
 ├── dca_config/v2
 │   ├── enabled: bool
 │   ├── mode: "rsi_v2"
-│   ├── quote_currency: string (EUR|USD)
+│   ├── quote_currency: string (EUR|USDC)
+│   ├── pairs: list[{symbol: string, pct: int}]     (multi-paires, optionnel)
 │   ├── base_daily_amount: float
 │   ├── execution_hour: int
 │   ├── execution_minute: int

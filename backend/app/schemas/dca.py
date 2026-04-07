@@ -92,6 +92,19 @@ class CrashLevel(BaseModel):
     reserve_pct: int = Field(ge=0, le=100)
 
 
+class PairAllocation(BaseModel):
+    """Allocation d'une paire dans le DCA multi-paires."""
+    symbol: str
+    pct: int = Field(ge=0, le=100)
+
+    @field_validator("symbol")
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        if v not in ALLOWED_SYMBOLS:
+            raise ValueError(f"Symbol must be one of {ALLOWED_SYMBOLS}")
+        return v
+
+
 class SpendingCaps(BaseModel):
     daily_cap: float = Field(default=DEFAULT_DAILY_CAP, gt=0)
     weekly_cap: float = Field(default=DEFAULT_WEEKLY_CAP, gt=0)
@@ -116,8 +129,11 @@ class DCAV2ConfigRead(BaseModel):
     enabled: bool = False
     mode: str = "rsi_v2"
 
-    # Paire de base (quote currency)
-    quote_currency: str = "EUR"  # EUR ou USD
+    # Paire de base (quote currency) – utilisé si pairs est vide
+    quote_currency: str = "EUR"  # EUR ou USDC
+
+    # Multi-paires : si défini, remplace le split BTC/ETH par régime
+    pairs: list[PairAllocation] = Field(default_factory=list)
 
     # Montants
     base_daily_amount: float = 12.0  # montant de base (×1)
@@ -156,7 +172,8 @@ class DCAV2ConfigRead(BaseModel):
 class DCAV2ConfigUpdate(BaseModel):
     """Payload de mise à jour DCA RSI v2."""
     enabled: bool
-    quote_currency: Literal["EUR", "USD"] = "EUR"
+    quote_currency: Literal["EUR", "USDC"] = "EUR"
+    pairs: list[PairAllocation] | None = None
     base_daily_amount: float = Field(gt=0)
     execution_hour: int = Field(ge=0, le=23)
     execution_minute: int = Field(ge=0, le=59)

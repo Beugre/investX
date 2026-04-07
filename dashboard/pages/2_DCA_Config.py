@@ -36,8 +36,15 @@ if not token:
     st.stop()
 
 # ── Exchange actif & paires correspondantes ──
-BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
-REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR"]
+BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "SOLUSDC"]
+REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "SOL-EUR", "BTC-USDC", "ETH-USDC", "SOL-USDC"]
+
+# Paires pour le DCA v1 (toutes les paires)
+BINANCE_V1_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
+REVOLUTX_V1_PAIRS = [
+    "BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR",
+    "BTC-USDC", "ETH-USDC", "SOL-USDC",
+]
 
 try:
     active_exchange = get_active_exchange(token)
@@ -45,7 +52,8 @@ except Exception:
     active_exchange = "binance"
 
 is_revolutx = active_exchange == "revolutx"
-available_pairs = REVOLUTX_PAIRS if is_revolutx else BINANCE_PAIRS
+available_pairs = REVOLUTX_V1_PAIRS if is_revolutx else BINANCE_V1_PAIRS
+dca_v2_pairs = REVOLUTX_PAIRS if is_revolutx else BINANCE_PAIRS
 exchange_label = "🔵 Revolut X" if is_revolutx else "🟡 Binance"
 quote_currency = "EUR" if is_revolutx else "USDC"
 
@@ -283,6 +291,99 @@ if sim_data:
 
 
 # ────────────────────────────────────────────────────
+# ÉTAPE 2b : Configuration multi-paires
+# ────────────────────────────────────────────────────
+st.markdown("### 🎯 Répartition par paires")
+
+existing_pairs = (v2_config or {}).get("pairs", [])
+
+use_custom_pairs = st.toggle(
+    "✏️ Répartition personnalisée (multi-paires)",
+    value=bool(existing_pairs),
+    help=(
+        "Par défaut, le montant est réparti BTC/ETH selon le régime de marché (MA200). "
+        "Activez pour choisir vos paires et leurs pourcentages."
+    ),
+)
+
+# Initialiser les paires en session_state
+if "v2_pairs" not in st.session_state:
+    if existing_pairs:
+        st.session_state.v2_pairs = [
+            {"symbol": p.get("symbol", dca_v2_pairs[0]), "pct": p.get("pct", 0)}
+            for p in existing_pairs
+        ]
+    else:
+        st.session_state.v2_pairs = [
+            {"symbol": dca_v2_pairs[0], "pct": 90},
+            {"symbol": dca_v2_pairs[1] if len(dca_v2_pairs) > 1 else dca_v2_pairs[0], "pct": 10},
+        ]
+
+custom_pairs_payload: list[dict] | None = None
+
+if use_custom_pairs:
+    st.caption(
+        f"Paires disponibles pour **{exchange_label}** : {', '.join(dca_v2_pairs)}. "
+        "Les pourcentages doivent totaliser 100%."
+    )
+
+    # Afficher les paires existantes
+    for i, pair_item in enumerate(st.session_state.v2_pairs):
+        col_sym, col_pct, col_del = st.columns([3, 2, 1])
+        with col_sym:
+            new_sym = st.selectbox(
+                f"Paire {i+1}",
+                dca_v2_pairs,
+                index=dca_v2_pairs.index(pair_item["symbol"]) if pair_item["symbol"] in dca_v2_pairs else 0,
+                key=f"pair_sym_{i}",
+            )
+            st.session_state.v2_pairs[i]["symbol"] = new_sym
+        with col_pct:
+            new_pct = st.number_input(
+                f"% paire {i+1}",
+                min_value=0, max_value=100, step=5,
+                value=pair_item["pct"],
+                key=f"pair_pct_{i}",
+            )
+            st.session_state.v2_pairs[i]["pct"] = new_pct
+        with col_del:
+            if len(st.session_state.v2_pairs) > 1:
+                if st.button("🗑️", key=f"pair_del_{i}"):
+                    st.session_state.v2_pairs.pop(i)
+                    st.rerun()
+
+    # Bouton ajouter
+    if len(st.session_state.v2_pairs) < len(dca_v2_pairs):
+        if st.button("➕ Ajouter une paire"):
+            used = {p["symbol"] for p in st.session_state.v2_pairs}
+            next_sym = next((s for s in dca_v2_pairs if s not in used), dca_v2_pairs[0])
+            st.session_state.v2_pairs.append({"symbol": next_sym, "pct": 0})
+            st.rerun()
+
+    # Validation total
+    total_pct = sum(p["pct"] for p in st.session_state.v2_pairs)
+    if total_pct != 100:
+        st.warning(f"⚠️ Total des pourcentages : **{total_pct}%** (doit être 100%)")
+    else:
+        st.success(f"✅ Répartition : {total_pct}%")
+
+    # Aperçu
+    st.caption("**Aperçu** (pour un montant ×1) :")
+    for p in st.session_state.v2_pairs:
+        if p["pct"] > 0:
+            st.write(f"  • {p['symbol']} → {p['pct']}% = {currency_symbol}{base_amount * p['pct'] / 100:.2f}")
+
+    custom_pairs_payload = [{"symbol": p["symbol"], "pct": p["pct"]} for p in st.session_state.v2_pairs]
+else:
+    st.info(
+        "Répartition automatique BTC/ETH selon le régime de marché :\n"
+        "- **Normal** : 90% BTC / 10% ETH\n"
+        "- **Faible** : 95% BTC / 5% ETH\n"
+        "- **Capitulation** : 100% BTC"
+    )
+
+
+# ────────────────────────────────────────────────────
 # ÉTAPE 3 : Configuration détaillée (override manuel)
 # ────────────────────────────────────────────────────
 st.markdown("### ⚙️ Paramètres détaillés")
@@ -467,6 +568,11 @@ if submitted:
             "total_budget": final_crash_budget,
         },
     }
+    # Ajouter les paires personnalisées si activées
+    if custom_pairs_payload is not None:
+        payload["pairs"] = custom_pairs_payload
+    else:
+        payload["pairs"] = []  # Reset : revenir au mode auto BTC/ETH
     try:
         update_dca_v2_config(token, payload)
         if enabled:
@@ -515,9 +621,14 @@ with st.expander("📊 Indicateurs en temps réel", expanded=True):
             st.divider()
             col_a, col_b = st.columns(2)
             with col_a:
-                st.write("**Split calculé**")
-                st.write(f"BTC ({status.get('btc_pct', 90)}%) : {currency_symbol}{status.get('btc_amount', 0):.2f}")
-                st.write(f"ETH ({status.get('eth_pct', 10)}%) : {currency_symbol}{status.get('eth_amount', 0):.2f}")
+                st.write("**Répartition calculée**")
+                pair_preview = status.get("pair_preview", [])
+                if pair_preview:
+                    for pp in pair_preview:
+                        st.write(f"  • {pp['symbol']} : {currency_symbol}{pp['amount']:.2f}")
+                else:
+                    st.write(f"BTC ({status.get('btc_pct', 90)}%) : {currency_symbol}{status.get('btc_amount', 0):.2f}")
+                    st.write(f"ETH ({status.get('eth_pct', 10)}%) : {currency_symbol}{status.get('eth_amount', 0):.2f}")
             with col_b:
                 if status.get("crash_reserve"):
                     cr = status["crash_reserve"]

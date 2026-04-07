@@ -470,22 +470,38 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
                             uid, boost_threshold,
                         )
 
-    # ── 8. Split BTC / ETH ──────────────────────────
-    btc_amount = round(raw_amount * btc_pct / 100, 2)
-    eth_amount = round(raw_amount * eth_pct / 100, 2)
-    total_amount = btc_amount + eth_amount
+    # ── 8. Split multi-paires (ou fallback BTC/ETH régime) ──
+    custom_pairs = config.get("pairs") or []
+    # Normaliser les dicts en objets simples
+    if custom_pairs and isinstance(custom_pairs[0], dict):
+        custom_pairs = [{"symbol": p["symbol"], "pct": p["pct"]} for p in custom_pairs]
 
-    # Minimum viable order (~1 EUR / 1 USD)
     MIN_ORDER = 1.0
-    if btc_amount < MIN_ORDER:
-        btc_amount = 0.0
-    if eth_amount < MIN_ORDER:
-        eth_amount = 0.0
+    pair_orders: list[dict] = []  # [{"symbol": ..., "amount": ...}, ...]
 
-    if btc_amount == 0 and eth_amount == 0:
+    if custom_pairs:
+        # Mode multi-paires : l'utilisateur définit les allocations
+        for p in custom_pairs:
+            amount = round(raw_amount * p["pct"] / 100, 2)
+            if amount >= MIN_ORDER:
+                pair_orders.append({"symbol": p["symbol"], "amount": amount})
+    else:
+        # Fallback : split BTC/ETH par régime MA200 (comportement historique)
+        btc_amount = round(raw_amount * btc_pct / 100, 2)
+        eth_amount = round(raw_amount * eth_pct / 100, 2)
+        if btc_amount >= MIN_ORDER:
+            pair_orders.append({"symbol": btc_symbol, "amount": btc_amount})
+        if eth_amount >= MIN_ORDER:
+            pair_orders.append({"symbol": eth_symbol, "amount": eth_amount})
+
+    if not pair_orders:
         logger.info("DCA v2 skip user %s: amounts too small after split", uid)
         audit_service.log_dca_skipped(uid, "Amounts too small", {"raw": raw_amount})
         return None
+
+    # Pour rétrocompatibilité des logs : extraire les montants BTC/ETH
+    btc_amount = sum(p["amount"] for p in pair_orders if "BTC" in p["symbol"].upper())
+    eth_amount = sum(p["amount"] for p in pair_orders if "ETH" in p["symbol"].upper())
 
     # ── 9. Crash reserve check ───────────────────────
     crash_cfg = config.get("crash_reserve", {})
@@ -558,23 +574,14 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
     orders_executed: list[dict] = []
     order_errors: list[str] = []
 
-    # Ordre BTC DCA normal
-    if btc_amount > 0:
-        btc_order = _place_order_safe(
-            uid, creds, btc_symbol, btc_amount, ORDER_SOURCE_SCHEDULER, exchange,
+    # Ordres DCA normaux (multi-paires)
+    for po in pair_orders:
+        order = _place_order_safe(
+            uid, creds, po["symbol"], po["amount"], ORDER_SOURCE_SCHEDULER, exchange,
             errors_out=order_errors,
         )
-        if btc_order:
-            orders_executed.append(btc_order)
-
-    # Ordre ETH DCA normal
-    if eth_amount > 0:
-        eth_order = _place_order_safe(
-            uid, creds, eth_symbol, eth_amount, ORDER_SOURCE_SCHEDULER, exchange,
-            errors_out=order_errors,
-        )
-        if eth_order:
-            orders_executed.append(eth_order)
+        if order:
+            orders_executed.append(order)
 
     # Ordres crash reserve (tout en BTC)
     if crash_amount > 0:
@@ -608,7 +615,7 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
         return None
 
     # ── 11. Enregistrement spending ──────────────────
-    actual_spent = btc_amount + eth_amount  # Crash reserve hors caps
+    actual_spent = sum(p["amount"] for p in pair_orders)  # Crash reserve hors caps
     if actual_spent > 0:
         firestore_service.increment_spending(uid, _today_key(), actual_spent)
         firestore_service.increment_spending(uid, _week_key(), actual_spent)
@@ -635,12 +642,14 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
         capped=capped, cap_reason=cap_reason,
         boost_cooldown=boost_cooldown_active,
         crash_levels=crash_levels_triggered,
+        pair_orders=pair_orders,
     )
 
     # ── 13. Notification Telegram ────────────────────
     _send_v2_telegram(
         uid, rsi, rsi_label, regime, btc_amount, eth_amount,
         crash_amount, crash_levels_triggered, orders_executed,
+        pair_orders=pair_orders,
     )
 
     # ── 14. Notification Email ────────────────────────
@@ -650,15 +659,19 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
     )
 
     # Refresh snapshots
-    for sym in {btc_symbol, eth_symbol}:
+    all_symbols = {p["symbol"] for p in pair_orders}
+    if crash_amount > 0:
+        all_symbols.add(btc_symbol)
+    for sym in all_symbols:
         try:
             portfolio_service.refresh_snapshot(uid, sym)
         except Exception as e:
             logger.warning("Failed to refresh snapshot for %s/%s: %s", uid, sym, e)
 
+    pair_summary = " | ".join(f"{p['symbol']}={p['amount']:.2f}" for p in pair_orders)
     logger.info(
-        "DCA v2 executed for %s: RSI=%.1f (%s) regime=%s BTC=%.2f ETH=%.2f crash=%.2f",
-        uid, rsi, rsi_label, regime, btc_amount, eth_amount, crash_amount,
+        "DCA v2 executed for %s: RSI=%.1f (%s) regime=%s pairs=[%s] crash=%.2f",
+        uid, rsi, rsi_label, regime, pair_summary, crash_amount,
     )
 
     return orders_executed[0] if orders_executed else None
@@ -728,10 +741,11 @@ def _save_cycle_log(
     capped: bool = False, cap_reason: str | None = None,
     boost_cooldown: bool = False,
     crash_levels: list[str] | None = None,
+    pair_orders: list[dict] | None = None,
 ) -> None:
     """Enregistre un log détaillé du cycle v2."""
     try:
-        firestore_service.save_dca_cycle_log(uid, {
+        log_data = {
             "mode": "rsi_v2",
             "rsi": rsi,
             "rsi_bracket": rsi_label,
@@ -754,7 +768,10 @@ def _save_cycle_log(
             "cap_reason": cap_reason,
             "boost_cooldown_active": boost_cooldown,
             "crash_levels_triggered": crash_levels or [],
-        })
+        }
+        if pair_orders:
+            log_data["pair_orders"] = pair_orders
+        firestore_service.save_dca_cycle_log(uid, log_data)
     except Exception as e:
         logger.warning("Failed to save cycle log for %s: %s", uid, e)
 
@@ -765,6 +782,7 @@ def _send_v2_telegram(
     btc_amount: float, eth_amount: float,
     crash_amount: float, crash_levels: list[str],
     orders: list[dict],
+    pair_orders: list[dict] | None = None,
 ) -> None:
     """Envoie une notification Telegram riche pour le DCA v2."""
     telegram_settings = firestore_service.get_telegram_settings(uid)
@@ -779,13 +797,22 @@ def _send_v2_telegram(
     # Déterminer le symbole monétaire
     cs = "€" if any(o.get("symbol", "").endswith("-EUR") for o in orders) else "$"
 
-    total = btc_amount + eth_amount + crash_amount
+    total = sum(p["amount"] for p in pair_orders) if pair_orders else (btc_amount + eth_amount)
+    total += crash_amount
+
     lines = [
         "📊 <b>DCA RSI v2 exécuté</b>",
         f"RSI : <code>{rsi:.1f}</code> ({rsi_label})",
         f"Régime : <code>{regime}</code>",
-        f"BTC : <code>{btc_amount:.2f} {cs}</code> | ETH : <code>{eth_amount:.2f} {cs}</code>",
     ]
+
+    if pair_orders:
+        for p in pair_orders:
+            lines.append(f"{p['symbol']} : <code>{p['amount']:.2f} {cs}</code>")
+    else:
+        lines.append(
+            f"BTC : <code>{btc_amount:.2f} {cs}</code> | ETH : <code>{eth_amount:.2f} {cs}</code>"
+        )
     if crash_amount > 0:
         lines.append(
             f"🚨 Crash reserve : <code>{crash_amount:.2f} {cs}</code> ({', '.join(crash_levels)})"
@@ -867,8 +894,29 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
         )
 
     raw_amount = base_amount * rsi_mult * mvrv_mult
-    btc_amount = round(raw_amount * btc_pct / 100, 2)
-    eth_amount = round(raw_amount * eth_pct / 100, 2)
+
+    # Multi-paires ou fallback BTC/ETH
+    custom_pairs = config.get("pairs") or []
+    MIN_ORDER = 1.0
+    pair_preview: list[dict] = []
+
+    if custom_pairs:
+        if isinstance(custom_pairs[0], dict):
+            custom_pairs = [{"symbol": p["symbol"], "pct": p["pct"]} for p in custom_pairs]
+        for p in custom_pairs:
+            amount = round(raw_amount * p["pct"] / 100, 2)
+            if amount >= MIN_ORDER:
+                pair_preview.append({"symbol": p["symbol"], "amount": amount})
+    else:
+        btc_amount = round(raw_amount * btc_pct / 100, 2)
+        eth_amount = round(raw_amount * eth_pct / 100, 2)
+        if btc_amount >= MIN_ORDER:
+            pair_preview.append({"symbol": btc_symbol, "amount": btc_amount})
+        if eth_amount >= MIN_ORDER:
+            pair_preview.append({"symbol": eth_symbol, "amount": eth_amount})
+
+    btc_amount = sum(p["amount"] for p in pair_preview if "BTC" in p["symbol"].upper())
+    eth_amount = sum(p["amount"] for p in pair_preview if "ETH" in p["symbol"].upper())
 
     # Spending
     spending = firestore_service.get_spending_amounts(
@@ -909,6 +957,7 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
         "raw_amount": round(raw_amount, 2),
         "btc_amount": btc_amount,
         "eth_amount": eth_amount,
+        "pair_preview": pair_preview,
         "spending": spending,
         "caps": {
             "daily_cap": caps.get("daily_cap", DEFAULT_DAILY_CAP),
