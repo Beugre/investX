@@ -26,6 +26,7 @@ from services.api_client import (
     get_dca_v2_auto_config,
     simulate_dca_v2,
     get_active_exchange,
+    get_exchange_balance,
 )
 
 st.set_page_config(page_title="DCA Config – InvestX", page_icon="⚙️", layout="wide")
@@ -555,6 +556,7 @@ if submitted:
 
     payload = {
         "enabled": enabled,
+        "mode": "rsi_v2",
         "quote_currency": quote,
         "base_daily_amount": base_amount,
         "execution_hour": hour,
@@ -617,6 +619,20 @@ with st.expander("📊 Indicateurs en temps réel", expanded=True):
             mvrv_val = status.get("mvrv")
             c3.metric("MVRV", f"{mvrv_val:.2f}" if mvrv_val else "N/A")
             c4.metric("Montant prévu", f"{currency_symbol}{status.get('raw_amount', 0):.2f}")
+
+            # ── Balance exchange ──
+            try:
+                bal_data = get_exchange_balance(token)
+                balances = bal_data.get("balances", {})
+                if balances:
+                    bal_cols = st.columns(len(balances))
+                    for i, (asset, amount) in enumerate(balances.items()):
+                        sym = "€" if asset == "EUR" else "$" if asset == "USDC" else ""
+                        bal_cols[i].metric(f"Balance {asset}", f"{sym}{amount:,.2f}")
+                elif bal_data.get("error"):
+                    st.caption(f"Balance indisponible : {bal_data['error']}")
+            except Exception:
+                pass
 
             st.divider()
             col_a, col_b = st.columns(2)

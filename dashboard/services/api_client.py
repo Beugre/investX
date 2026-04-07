@@ -230,6 +230,10 @@ def set_active_exchange(token: str, exchange: str) -> dict:
     return _put("/me/exchange", token, json={"exchange": exchange})
 
 
+def get_exchange_balance(token: str) -> dict:
+    return _get("/me/balance", token)
+
+
 # ── Portfolio ──
 def get_portfolio_summary(token: str) -> dict:
     return _get("/portfolio/summary", token)

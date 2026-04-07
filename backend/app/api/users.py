@@ -11,7 +11,10 @@ from app.core.auth_firebase import get_current_uid
 from app.core.exceptions import NotFound, BadRequest
 from pydantic import BaseModel
 from app.schemas.user import UserProfile, OnboardingResponse
-from app.services import firestore_service, email_service
+from app.services import firestore_service, email_service, binance_service, revolutx_service, secret_manager_service
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["Users"])
 
@@ -119,3 +122,37 @@ async def set_active_exchange(
         raise BadRequest(f"Exchange '{body.exchange}' not supported. Valid: {SUPPORTED_EXCHANGES}")
     firestore_service.set_active_exchange(uid, body.exchange)
     return {"active_exchange": body.exchange}
+
+
+# ── Balance exchange ──
+
+@router.get("/me/balance")
+async def get_balance(uid: str = Depends(get_current_uid)):
+    """Retourne les balances USDC et EUR (et autres stables) de l'exchange actif."""
+    exchange = firestore_service.get_active_exchange(uid)
+
+    try:
+        if exchange == "revolutx":
+            account = firestore_service.get_revolutx_account(uid)
+            if not account or not account.get("is_connected"):
+                return {"exchange": exchange, "balances": {}, "error": "Exchange not connected"}
+            creds = secret_manager_service.get_revolutx_secret(uid)
+            raw = revolutx_service.get_asset_balances(
+                api_key=creds["api_key"],
+                private_key_pem=creds["private_key_pem"],
+                assets=["EUR", "USDC"],
+            )
+        else:
+            account = firestore_service.get_binance_account(uid)
+            if not account or not account.get("is_connected"):
+                return {"exchange": exchange, "balances": {}, "error": "Exchange not connected"}
+            creds = secret_manager_service.get_binance_secret(uid)
+            raw = binance_service.get_asset_balances(
+                api_key=creds["api_key"],
+                api_secret=creds["api_secret"],
+                assets=["USDC", "EUR"],
+            )
+        return {"exchange": exchange, "balances": raw}
+    except Exception as e:
+        logger.warning("Failed to fetch balance for user %s: %s", uid, e)
+        return {"exchange": exchange, "balances": {}, "error": str(e)}

@@ -194,7 +194,7 @@ def execute_user_dca(uid: str) -> dict | None:
 
     # Vérifier si v2
     v2_config = firestore_service.get_dca_v2_config(uid)
-    if v2_config and v2_config.get("mode") == "rsi_v2" and v2_config.get("enabled"):
+    if v2_config and v2_config.get("enabled"):
         return _execute_user_dca_v2(uid, v2_config)
 
     # 2. Vérifier config DCA v1
