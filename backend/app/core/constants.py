@@ -39,15 +39,15 @@ DCA_V2_VALID_PAIRS: Final[dict[str, dict[str, str]]] = {
     "EUR":  {"btc": "BTC-EUR", "eth": "ETH-EUR"},
 }
 
+# ── Exchanges supportés ──
+EXCHANGE_BINANCE: Final[str] = "binance"
+EXCHANGE_REVOLUTX: Final[str] = "revolutx"
+
 # ── Paires DCA v2 disponibles par exchange (pour multi-paires) ──
 DCA_V2_ALL_SYMBOLS: Final[dict[str, list[str]]] = {
     EXCHANGE_BINANCE:  ["BTCUSDC", "ETHUSDC", "SOLUSDC"],
     EXCHANGE_REVOLUTX: ["BTC-EUR", "ETH-EUR", "SOL-EUR", "BTC-USDC", "ETH-USDC", "SOL-USDC"],
 }
-
-# ── Exchanges supportés ──
-EXCHANGE_BINANCE: Final[str] = "binance"
-EXCHANGE_REVOLUTX: Final[str] = "revolutx"
 SUPPORTED_EXCHANGES: Final[list[str]] = [EXCHANGE_BINANCE, EXCHANGE_REVOLUTX]
 DEFAULT_EXCHANGE: Final[str] = EXCHANGE_BINANCE
 
