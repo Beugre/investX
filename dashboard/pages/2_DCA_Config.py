@@ -630,9 +630,11 @@ with st.expander("📊 Indicateurs en temps réel", expanded=True):
                         sym = "€" if asset == "EUR" else "$" if asset == "USDC" else ""
                         bal_cols[i].metric(f"Balance {asset}", f"{sym}{amount:,.2f}")
                 elif bal_data.get("error"):
-                    st.caption(f"Balance indisponible : {bal_data['error']}")
-            except Exception:
-                pass
+                    st.caption(f"⚠️ Balance indisponible : {bal_data['error']}")
+                else:
+                    st.caption("Aucune balance EUR/USDC trouvée")
+            except Exception as e:
+                st.caption(f"⚠️ Erreur balance : {e}")
 
             st.divider()
             col_a, col_b = st.columns(2)
