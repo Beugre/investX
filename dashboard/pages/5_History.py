@@ -104,31 +104,42 @@ with tab_cycles:
         if logs:
             df = pd.DataFrame(logs)
 
-            if "started_at" in df.columns:
-                df["started_at"] = pd.to_datetime(df["started_at"], errors="coerce")
-                df = df.sort_values("started_at", ascending=True)
+            # Le backend sauvegarde "created_at" (pas "started_at")
+            time_col = "started_at" if "started_at" in df.columns else "created_at"
+            if time_col in df.columns:
+                df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
+                df = df.sort_values(time_col, ascending=True)
+
+            # Le backend sauvegarde "total_amount" (pas "total_invested")
+            amount_col = "total_invested" if "total_invested" in df.columns else "total_amount"
 
             # Graphique : montant investi par cycle
-            if "total_invested" in df.columns and "started_at" in df.columns:
+            if amount_col in df.columns and time_col in df.columns:
                 st.markdown("**💰 Montant investi par cycle**")
-                chart_data = df.set_index("started_at")[["total_invested"]].dropna()
+                chart_data = df.set_index(time_col)[[amount_col]].dropna()
                 if not chart_data.empty:
                     st.bar_chart(chart_data)
 
-            # Graphique : nombre d'ordres par cycle
-            if "orders_count" in df.columns and "started_at" in df.columns:
+            # Graphique : nombre d'ordres par cycle (si disponible)
+            orders_col = "orders_count" if "orders_count" in df.columns else None
+            if not orders_col and "pair_orders" in df.columns:
+                df["orders_count"] = df["pair_orders"].apply(
+                    lambda x: len(x) if isinstance(x, list) else 0
+                )
+                orders_col = "orders_count"
+            if orders_col and time_col in df.columns:
                 st.markdown("**📊 Nombre d'ordres par cycle**")
-                chart_data2 = df.set_index("started_at")[["orders_count"]].dropna()
+                chart_data2 = df.set_index(time_col)[[orders_col]].dropna()
                 if not chart_data2.empty:
                     st.bar_chart(chart_data2)
 
             # Tableau détaillé
             st.markdown("**📋 Détails des cycles**")
-            display_cols = [c for c in ["started_at", "status", "mode", "total_invested",
-                                        "orders_count", "duration_s"] if c in df.columns]
+            display_cols = [c for c in [time_col, "status", "mode", amount_col,
+                                        "orders_count", "rsi", "regime"] if c in df.columns]
             df_display = df[display_cols].copy()
-            if "started_at" in df_display.columns:
-                df_display["started_at"] = df_display["started_at"].dt.strftime("%d/%m/%Y %H:%M")
+            if time_col in df_display.columns:
+                df_display[time_col] = df_display[time_col].dt.strftime("%d/%m/%Y %H:%M")
             st.dataframe(df_display, use_container_width=True, hide_index=True)
         else:
             st.info("Aucun cycle v2 enregistré.")

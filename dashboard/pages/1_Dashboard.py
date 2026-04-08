@@ -94,6 +94,22 @@ if v2_active:
                         bal_cols[i].metric(f"💰 Balance {asset}", f"{sym}{amount:,.2f}")
             except Exception:
                 pass
+
+            # ── Spending caps ──
+            spending = v2_status.get("spending", {})
+            caps = v2_status.get("caps", {})
+            if spending or caps:
+                st.markdown("**📊 Limites de dépenses**")
+                sc1, sc2, sc3 = st.columns(3)
+                daily_spent = spending.get("daily", 0)
+                daily_cap = caps.get("daily_cap", 0)
+                weekly_spent = spending.get("weekly", 0)
+                weekly_cap = caps.get("weekly_cap", 0)
+                monthly_spent = spending.get("monthly", 0)
+                monthly_cap = caps.get("monthly_cap", 0)
+                sc1.metric("Jour", f"{active_cs}{daily_spent:.2f} / {daily_cap:.0f}")
+                sc2.metric("Semaine", f"{active_cs}{weekly_spent:.2f} / {weekly_cap:.0f}")
+                sc3.metric("Mois", f"{active_cs}{monthly_spent:.2f} / {monthly_cap:.0f}")
         else:
             st.info(v2_status["error"])
     except Exception as e:

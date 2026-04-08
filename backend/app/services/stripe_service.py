@@ -56,11 +56,20 @@ def verify_webhook_signature(payload: bytes, signature: str) -> dict[str, Any]:
 
 
 def handle_event(event: dict[str, Any]) -> None:
-    """Traite un événement Stripe webhook."""
+    """Traite un événement Stripe webhook (avec idempotency)."""
     event_type = event["type"]
+    event_id = event["id"]
     data_object = event["data"]["object"]
 
-    logger.info("Handling Stripe event: %s", event_type)
+    logger.info("Handling Stripe event: %s (%s)", event_type, event_id)
+
+    # Idempotency: skip si déjà traité
+    db = firestore_service._db()
+    event_ref = db.collection("stripe_events").document(event_id)
+    if event_ref.get().exists:
+        logger.info("Stripe event %s already processed, skipping", event_id)
+        return
+    event_ref.set({"type": event_type, "processed_at": datetime.now(timezone.utc)})
 
     if event_type == "checkout.session.completed":
         _handle_checkout_completed(data_object)

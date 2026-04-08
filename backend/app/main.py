@@ -81,17 +81,19 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──
+_default_origins = [
+    "https://investxbot.com",
+    "https://www.investxbot.com",
+    "http://localhost:8501",
+    "http://localhost:8601",
+]
+_extra = settings.app_base_url
+_cors_origins = _default_origins + ([_extra] if _extra and _extra not in _default_origins else [])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://investxbot.com",
-        "https://www.investxbot.com",
-        "http://localhost:8501",
-        "http://localhost:8601",
-        "http://213.199.41.168:8601",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
 

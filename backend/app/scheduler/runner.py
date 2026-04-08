@@ -11,6 +11,7 @@ from app.scheduler.jobs import portfolio_refresh_job
 from app.scheduler.health_job import health_check_job
 from app.scheduler.alerts_job import check_price_alerts_job
 from app.scheduler.take_profit_job import check_take_profit_job
+from app.scheduler.cleanup_job import cleanup_old_records_job
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ def start_scheduler() -> None:
     scheduler.add_job(
         portfolio_refresh_job,
         trigger="interval",
-        minutes=1,
+        minutes=5,
         id="portfolio_refresh",
         replace_existing=True,
         max_instances=1,
@@ -60,8 +61,16 @@ def start_scheduler() -> None:
         replace_existing=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        cleanup_old_records_job,
+        trigger="interval",
+        hours=24,
+        id="cleanup",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
-    logger.info("Scheduler started (DCA + portfolio + health + alerts + take-profit)")
+    logger.info("Scheduler started (DCA + portfolio + health + alerts + take-profit + cleanup)")
 
 
 def stop_scheduler() -> None:

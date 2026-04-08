@@ -871,6 +871,7 @@ def compute_v2_preview(uid: str) -> dict[str, Any]:
     quote = config.get("quote_currency", default_quote)
     pairs = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
     btc_symbol = pairs["btc"]
+    eth_symbol = pairs["eth"]
     base_amount = config.get("base_daily_amount", 12.0)
 
     # Klines

@@ -20,19 +20,38 @@ router = APIRouter(tags=["Portfolio"])
 
 @router.get("/portfolio/summary", response_model=PortfolioSummary)
 async def get_portfolio_summary(uid: str = Depends(get_current_uid)):
-    """Retourne le résumé portfolio (snapshots les plus récents)."""
-    config = firestore_service.get_dca_config(uid)
-    if not config:
+    """Retourne le résumé portfolio (snapshots les plus récents, v1 + v2)."""
+    symbols: set[str] = set()
+
+    # v2 multi-paires
+    v2_config = firestore_service.get_dca_v2_config(uid)
+    if v2_config and v2_config.get("enabled"):
+        pairs = v2_config.get("pairs") or []
+        for p in pairs:
+            sym = p.get("symbol") if isinstance(p, dict) else None
+            if sym:
+                symbols.add(sym)
+        if not symbols:
+            from app.core.constants import DCA_V2_VALID_PAIRS, EXCHANGE_DEFAULT_QUOTE
+            exchange = firestore_service.get_active_exchange(uid)
+            quote = v2_config.get("quote_currency", EXCHANGE_DEFAULT_QUOTE.get(exchange, "USDC"))
+            vp = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
+            symbols.update(vp.values())
+
+    # v1 fallback
+    if not symbols:
+        config = firestore_service.get_dca_config(uid)
+        if config and config.get("enabled"):
+            symbols.add(config.get("symbol", "BTCUSDC"))
+
+    if not symbols:
         return PortfolioSummary()
 
-    symbol = config.get("symbol", "BTCUSDC")
-
-    # Essayer d'utiliser le dernier snapshot en base
-    snap = firestore_service.get_latest_snapshot(uid, symbol)
-    if snap:
-        snapshots = [PortfolioSnapshot(**snap)]
-    else:
-        snapshots = []
+    snapshots = []
+    for symbol in symbols:
+        snap = firestore_service.get_latest_snapshot(uid, symbol)
+        if snap:
+            snapshots.append(PortfolioSnapshot(**snap))
 
     return PortfolioSummary(snapshots=snapshots)
 

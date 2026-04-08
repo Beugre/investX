@@ -4,11 +4,15 @@ Page 10 – Dashboard Admin (réservé à l'administrateur).
 
 import streamlit as st
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 from components.auth_guard import require_auth
 from services.api_client import admin_overview, admin_list_users, admin_recent_orders, check_admin
 
 st.set_page_config(page_title="Admin – InvestX", page_icon="🔐", layout="wide")
+
+# Auto-refresh toutes les 30 secondes
+st_autorefresh(interval=30_000, limit=None, key="admin_autorefresh")
 
 token = require_auth()
 if not token:
@@ -40,6 +44,15 @@ try:
     users = admin_list_users(token)
     if users:
         df = pd.DataFrame(users)
+
+        # Résumé abonnements
+        if "subscription_status" in df.columns:
+            sub_counts = df["subscription_status"].value_counts()
+            sub_cols = st.columns(len(sub_counts))
+            for i, (status, count) in enumerate(sub_counts.items()):
+                icon = "✅" if status == "active" else "⚠️" if status == "past_due" else "❌"
+                sub_cols[i].metric(f"{icon} {status}", count)
+
         cols = ["email", "display_name", "dca_v1_enabled", "dca_v2_enabled",
                 "subscription_plan", "subscription_status"]
         display_cols = [c for c in cols if c in df.columns]

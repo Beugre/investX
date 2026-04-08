@@ -49,3 +49,22 @@ async def health_check():
         "checks": checks,
         "timestamp": now.isoformat(),
     }
+
+
+@router.get("/health/scheduler")
+async def scheduler_health():
+    """Détail des jobs du scheduler (next_run, état)."""
+    from app.scheduler.runner import scheduler
+
+    if not scheduler.running:
+        return {"status": "stopped", "jobs": []}
+
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append({
+            "id": job.id,
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "trigger": str(job.trigger),
+        })
+
+    return {"status": "running", "jobs": jobs}

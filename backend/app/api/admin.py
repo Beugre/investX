@@ -44,13 +44,18 @@ async def admin_overview(uid: str = Depends(_require_admin)):
     total_users = len(users)
     dca_v1_active = 0
     dca_v2_active = 0
+
+    db = firestore_service._db()
     for user in users:
         u = user["uid"]
-        cfg = firestore_service.get_dca_config(u)
-        if cfg and cfg.get("enabled"):
+        # Batch reads en parallèle au lieu de 2 appels séparés
+        cfg_ref = db.collection("users").document(u).collection("dca_config").document("main")
+        v2_ref = db.collection("users").document(u).collection("dca_v2_config").document("main")
+        cfg_doc = cfg_ref.get()
+        v2_doc = v2_ref.get()
+        if cfg_doc.exists and cfg_doc.to_dict().get("enabled"):
             dca_v1_active += 1
-        v2 = firestore_service.get_dca_v2_config(u)
-        if v2 and v2.get("enabled"):
+        if v2_doc.exists and v2_doc.to_dict().get("enabled"):
             dca_v2_active += 1
 
     return {
@@ -64,12 +69,17 @@ async def admin_overview(uid: str = Depends(_require_admin)):
 async def admin_list_users(uid: str = Depends(_require_admin)):
     """Liste tous les utilisateurs avec leur statut."""
     users = firestore_service.get_all_active_users()
+    db = firestore_service._db()
     result = []
     for user in users:
         u = user["uid"]
-        cfg = firestore_service.get_dca_config(u)
-        v2 = firestore_service.get_dca_v2_config(u)
-        sub = firestore_service.get_subscription(u)
+        user_ref = db.collection("users").document(u)
+        cfg_doc = user_ref.collection("dca_config").document("main").get()
+        v2_doc = user_ref.collection("dca_v2_config").document("main").get()
+        sub_doc = user_ref.collection("subscription").document("main").get()
+        cfg = cfg_doc.to_dict() if cfg_doc.exists else None
+        v2 = v2_doc.to_dict() if v2_doc.exists else None
+        sub = sub_doc.to_dict() if sub_doc.exists else None
         result.append({
             "uid": u,
             "email": user.get("email", ""),

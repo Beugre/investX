@@ -267,7 +267,7 @@ if sim_data:
         pivot = pivot.rename(index=row_labels, columns=col_labels)
 
         st.dataframe(
-            pivot.style.format(f"{currency_symbol}{{:.2f}}").applymap(
+            pivot.style.format(f"{currency_symbol}{{:.2f}}").map(
                 lambda v: (
                     "background-color: #1a472a; color: #4ade80"
                     if isinstance(v, (int, float)) and v >= base_amount * 3

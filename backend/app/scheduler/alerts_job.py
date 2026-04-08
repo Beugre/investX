@@ -59,8 +59,7 @@ def check_price_alerts_job() -> None:
                 try:
                     tg = firestore_service.get_telegram_settings(uid)
                     if tg and tg.get("chat_id") and tg.get("notify_on_execution", True):
-                        import asyncio
-                        asyncio.run(telegram_service.send_message(tg["chat_id"], msg))
+                        telegram_service.send_message_sync(tg["chat_id"], msg)
                 except Exception as e:
                     logger.warning("Alert notification failed for %s: %s", uid, e)
 

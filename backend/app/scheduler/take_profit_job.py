@@ -66,7 +66,7 @@ def _execute_take_profit(
         logger.warning("Take-profit: no snapshot for %s/%s", uid, symbol)
         return
 
-    total_qty = snapshot.get("total_quantity", 0)
+    total_qty = snapshot.get("quantity_total", 0)
     if total_qty <= 0:
         return
 
@@ -122,8 +122,7 @@ def _execute_take_profit(
         try:
             tg = firestore_service.get_telegram_settings(uid)
             if tg and tg.get("chat_id"):
-                import asyncio
-                asyncio.run(telegram_service.send_message(tg["chat_id"], msg))
+                telegram_service.send_message_sync(tg["chat_id"], msg)
         except Exception:
             pass
 
