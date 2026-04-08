@@ -6,14 +6,23 @@ import streamlit as st
 import pandas as pd
 
 from components.auth_guard import require_auth
-from services.api_client import admin_overview, admin_list_users, admin_recent_orders
+from services.api_client import admin_overview, admin_list_users, admin_recent_orders, check_admin
 
 st.set_page_config(page_title="Admin – InvestX", page_icon="🔐", layout="wide")
-st.title("🔐 Dashboard Admin")
 
 token = require_auth()
 if not token:
     st.stop()
+
+# Vérifier accès admin
+if "is_admin" not in st.session_state:
+    st.session_state["is_admin"] = check_admin(token)
+
+if not st.session_state.get("is_admin", False):
+    st.error("⛔ Accès refusé : vous n'êtes pas administrateur.")
+    st.stop()
+
+st.title("🔐 Dashboard Admin")
 
 # ── Vue d'ensemble ──
 try:
@@ -53,7 +62,4 @@ try:
         st.info("Aucun ordre récent.")
 
 except Exception as e:
-    if "403" in str(e) or "Admin" in str(e):
-        st.error("⛔ Accès refusé : vous n'êtes pas administrateur.")
-    else:
-        st.error(f"Erreur : {e}")
+    st.error(f"Erreur : {e}")

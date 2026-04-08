@@ -32,6 +32,8 @@ def require_auth() -> str | None:
         st.warning("🔒 Veuillez vous connecter pour accéder à cette page.")
         st.stop()
         return None
+
+    _inject_admin_visibility()
     return st.session_state["token"]
 
 

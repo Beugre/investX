@@ -31,6 +31,12 @@ def _require_admin(uid: str = Depends(get_current_uid)) -> str:
     return uid
 
 
+@router.get("/check")
+async def admin_check(uid: str = Depends(get_current_uid)):
+    """Vérifie si l'utilisateur courant est admin."""
+    return {"is_admin": uid in ADMIN_UIDS}
+
+
 @router.get("/overview")
 async def admin_overview(uid: str = Depends(_require_admin)):
     """Vue d'ensemble : nombre d'utilisateurs, DCA actifs, ordres."""

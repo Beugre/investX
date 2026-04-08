@@ -21,6 +21,7 @@ from services.api_client import (
     get_dca_config,
     get_user_profile,
     update_user_profile,
+    check_admin,
 )
 from services.session_manager import try_restore_session, save_session, clear_session
 
@@ -201,6 +202,15 @@ def _logged_in_home():
     """Accueil personnalisé avec barre de progression onboarding."""
     token = st.session_state.get("token", "")
     email = st.session_state.get("email", "")
+
+    # Vérifier le statut admin (une seule fois par session)
+    if "is_admin" not in st.session_state:
+        st.session_state["is_admin"] = check_admin(token)
+
+    # Cacher le lien Admin dans la sidebar si non-admin
+    if not st.session_state.get("is_admin", False):
+        from components.auth_guard import _HIDE_ADMIN_NAV
+        st.markdown(_HIDE_ADMIN_NAV, unsafe_allow_html=True)
 
     # Récupérer le display_name depuis le profil
     display_name = ""

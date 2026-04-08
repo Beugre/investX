@@ -331,6 +331,15 @@ def delete_alert(token: str, alert_id: str) -> dict:
 
 
 # ── Admin ──
+def check_admin(token: str) -> bool:
+    """Vérifie si l'utilisateur courant est admin."""
+    try:
+        resp = _get("/admin/check", token)
+        return resp.get("is_admin", False)
+    except Exception:
+        return False
+
+
 def admin_overview(token: str) -> dict:
     return _get("/admin/overview", token)
 
