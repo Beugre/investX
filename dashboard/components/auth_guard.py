@@ -8,14 +8,23 @@ import streamlit as st
 
 _HIDE_ADMIN_NAV = """
 <style>
-    [data-testid="stSidebarNav"] li:has(a[href*="Admin"]) { display: none; }
+    [data-testid="stSidebarNav"] li:last-child { display: none !important; }
 </style>
 """
 
 
 def _inject_admin_visibility():
     """Cache le lien Admin dans la sidebar si l'utilisateur n'est pas admin."""
-    if not st.session_state.get("is_admin", False):
+    # Vérifier le statut admin si pas encore fait
+    if "is_admin" not in st.session_state:
+        token = st.session_state.get("token", "")
+        if token:
+            from services.api_client import check_admin
+            st.session_state["is_admin"] = check_admin(token)
+        else:
+            st.session_state["is_admin"] = False
+
+    if not st.session_state["is_admin"]:
         st.markdown(_HIDE_ADMIN_NAV, unsafe_allow_html=True)
 
 
