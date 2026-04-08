@@ -19,6 +19,7 @@ from services.api_client import (
     get_revolutx_status,
     get_telegram_settings,
     get_dca_config,
+    get_dca_v2_config,
     get_user_profile,
     update_user_profile,
     check_admin,
@@ -266,6 +267,12 @@ def _logged_in_home():
         check_dca = dca.get("enabled", False) if dca else False
     except Exception:
         pass
+    if not check_dca:
+        try:
+            v2 = get_dca_v2_config(token)
+            check_dca = v2.get("enabled", False) if v2 else False
+        except Exception:
+            pass
 
     check_telegram = False
     try:
