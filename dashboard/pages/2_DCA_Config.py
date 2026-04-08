@@ -710,7 +710,7 @@ with st.expander("💰 Take-Profit (sortie automatique)"):
     with st.form("tp_form"):
         col1, col2, col3 = st.columns(3)
         with col1:
-            all_pairs = v2_pairs if exchange_detected else BINANCE_PAIRS
+            all_pairs = REVOLUTX_PAIRS if is_revolutx else BINANCE_PAIRS
             tp_symbol = st.selectbox("Paire", all_pairs, key="tp_sym")
         with col2:
             tp_price = st.number_input("Prix cible", min_value=1.0, step=100.0, key="tp_price")
