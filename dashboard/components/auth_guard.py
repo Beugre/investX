@@ -6,6 +6,18 @@ from __future__ import annotations
 
 import streamlit as st
 
+_HIDE_ADMIN_NAV = """
+<style>
+    [data-testid="stSidebarNav"] li:has(a[href*="Admin"]) { display: none; }
+</style>
+"""
+
+
+def _inject_admin_visibility():
+    """Cache le lien Admin dans la sidebar si l'utilisateur n'est pas admin."""
+    if not st.session_state.get("is_admin", False):
+        st.markdown(_HIDE_ADMIN_NAV, unsafe_allow_html=True)
+
 
 def require_auth() -> str | None:
     """Vérifie que l'utilisateur est authentifié.
