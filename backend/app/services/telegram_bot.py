@@ -158,9 +158,9 @@ async def stop_bot() -> None:
 
 # ── Mode Webhook ──
 
-import secrets
+import os
 
-WEBHOOK_SECRET = secrets.token_urlsafe(32)
+WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "investx-tg-webhook-default-secret")
 
 
 async def _setup_webhook() -> None:

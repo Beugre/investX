@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from app.logger import get_logger
 from app.services import firestore_service, telegram_service
-from app.services.binance_service import get_ticker_price
+from app.services.binance_service import get_symbol_price_no_auth
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ def check_price_alerts_job() -> None:
         prices: dict[str, float] = {}
         for sym in symbols:
             try:
-                price = get_ticker_price(sym)
+                price = get_symbol_price_no_auth(sym)
                 if price and price > 0:
                     prices[sym] = price
             except Exception as e:

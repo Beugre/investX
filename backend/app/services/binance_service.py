@@ -139,6 +139,46 @@ def place_market_buy_order(
         raise BinanceError(f"Order failed: {e}") from e
 
 
+def place_market_sell_order(
+    api_key: str,
+    api_secret: str,
+    symbol: str,
+    quantity: float,
+) -> dict[str, Any]:
+    """Passe un ordre market sell sur Binance."""
+    try:
+        client = _get_client(api_key, api_secret)
+        order = client.order_market_sell(
+            symbol=symbol,
+            quantity=f"{quantity:.8f}",
+        )
+        logger.info(
+            "Market sell order placed: symbol=%s, qty=%s, orderId=%s",
+            symbol, quantity, order.get("orderId"),
+        )
+
+        fills = order.get("fills", [])
+        total_qty = sum(float(f["qty"]) for f in fills)
+        total_cost = sum(float(f["qty"]) * float(f["price"]) for f in fills)
+        avg_price = total_cost / total_qty if total_qty > 0 else 0.0
+
+        return {
+            "symbol": symbol,
+            "side": "SELL",
+            "quantity": total_qty,
+            "price": avg_price,
+            "amount_eur": total_cost,
+            "status": order.get("status", "FILLED"),
+            "exchange_order_id": str(order.get("orderId", "")),
+        }
+    except BinanceAPIException as e:
+        logger.error("Binance sell order failed: %s", e)
+        raise BinanceError(f"Sell order failed: {e.message}") from e
+    except Exception as e:
+        logger.error("Unexpected error placing Binance sell order: %s", e)
+        raise BinanceError(f"Sell order failed: {e}") from e
+
+
 def get_symbol_price(api_key: str, api_secret: str, symbol: str) -> float:
     """Retourne le prix actuel d'un symbole."""
     try:

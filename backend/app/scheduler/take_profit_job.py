@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from app.logger import get_logger
 from app.services import firestore_service, telegram_service
-from app.services.binance_service import get_ticker_price
+from app.services.binance_service import get_symbol_price_no_auth
 
 logger = get_logger(__name__)
 
@@ -30,7 +30,7 @@ def check_take_profit_job() -> None:
                     continue
 
                 try:
-                    current_price = get_ticker_price(symbol)
+                    current_price = get_symbol_price_no_auth(symbol)
                     if not current_price or current_price < target_price:
                         continue
 
@@ -49,12 +49,16 @@ def _execute_take_profit(
     current_price: float, target_price: float,
 ) -> None:
     """Exécute un ordre de vente take-profit."""
-    from app.services.dca_service import _get_exchange_client, _get_user_exchange
+    from app.services.dca_service import _get_exchange_context
+    from app.services import binance_service, revolutx_service
 
-    exchange = _get_user_exchange(uid)
-    if not exchange:
+    ctx = _get_exchange_context(uid)
+    if not ctx:
         logger.warning("Take-profit: no exchange for %s", uid)
         return
+
+    exchange = ctx["exchange"]
+    creds = ctx["creds"]
 
     # Calculer la quantité à vendre
     snapshot = firestore_service.get_latest_snapshot(uid, symbol)
@@ -71,12 +75,21 @@ def _execute_take_profit(
         return
 
     try:
-        client = _get_exchange_client(uid, exchange)
-        if not client:
-            return
-
         # Placer l'ordre de vente market
-        order = client.create_market_sell_order(symbol, sell_qty)
+        if exchange == "binance":
+            order = binance_service.place_market_sell_order(
+                api_key=creds["api_key"],
+                api_secret=creds["api_secret"],
+                symbol=symbol,
+                quantity=sell_qty,
+            )
+        else:
+            order = revolutx_service.place_market_sell_order(
+                api_key=creds["api_key"],
+                private_key_pem=creds["private_key_pem"],
+                symbol=symbol,
+                quantity=sell_qty,
+            )
         logger.info(
             "Take-profit SELL executed: %s %s %.8f @ %.2f (target: %.2f)",
             uid, symbol, sell_qty, current_price, target_price,

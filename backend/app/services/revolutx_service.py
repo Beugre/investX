@@ -256,6 +256,77 @@ def place_market_buy_order(
     return _place_taker_order(api_key, private_key_pem, symbol, quote_amount)
 
 
+def place_market_sell_order(
+    api_key: str,
+    private_key_pem: str,
+    symbol: str,
+    quantity: float,
+) -> dict[str, Any]:
+    """Place un ordre market sell (taker) sur Revolut X."""
+    import time as _time
+
+    _FAILED_STATES = {"CANCELLED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"}
+    _SUCCESS_STATES = {"FILLED", "DONE", "COMPLETED"}
+
+    client_order_id = str(uuid.uuid4())
+    body = {
+        "client_order_id": client_order_id,
+        "symbol": symbol,
+        "side": "SELL",
+        "order_configuration": {
+            "market": {
+                "base_size": str(round(quantity, 8)),
+            }
+        },
+    }
+
+    try:
+        result = _request(api_key, private_key_pem, "POST", "/orders", json_body=body)
+        data = result.get("data", result)
+        logger.info("Revolut X POST /orders (sell) response: %s", json.dumps(data, default=str)[:500])
+
+        venue_order_id = data.get("venue_order_id", data.get("id", client_order_id))
+        state = (data.get("state") or data.get("status") or "PENDING").upper()
+
+        if state in _FAILED_STATES:
+            _handle_failed_state(data, venue_order_id, state)
+
+        for attempt in range(8):
+            if state in _SUCCESS_STATES:
+                break
+            _time.sleep(0.75)
+            try:
+                poll_result = _request(api_key, private_key_pem, "GET", f"/orders/{venue_order_id}")
+                order_data = poll_result.get("data", poll_result)
+                state = (order_data.get("state") or order_data.get("status") or state).upper()
+                if state in _FAILED_STATES:
+                    _handle_failed_state(order_data, venue_order_id, state)
+            except ExchangeError:
+                raise
+            except Exception as e:
+                logger.debug("Sell poll %d failed: %s", attempt + 1, e)
+
+        # Construire le résultat
+        executed_qty = float(data.get("executed_base_size", data.get("filled_size", quantity)))
+        executed_quote = float(data.get("executed_quote_size", data.get("filled_notional", 0)))
+        avg_price = executed_quote / executed_qty if executed_qty > 0 else 0.0
+
+        return {
+            "symbol": symbol,
+            "side": "SELL",
+            "quantity": executed_qty,
+            "price": avg_price,
+            "amount_eur": executed_quote,
+            "status": state,
+            "exchange_order_id": str(venue_order_id),
+        }
+    except ExchangeError:
+        raise
+    except Exception as e:
+        logger.error("Revolut X sell order failed: %s", e)
+        raise ExchangeError(f"Sell order failed: {e}") from e
+
+
 def _place_taker_order(
     api_key: str,
     private_key_pem: str,

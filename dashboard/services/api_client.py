@@ -280,7 +280,7 @@ def export_orders_csv(token: str, symbol: str | None = None, limit: int = 500) -
         params["symbol"] = symbol
     import requests
     resp = requests.get(
-        f"{API_BASE}/orders/export",
+        f"{API_BASE_URL}/orders/export",
         headers={"Authorization": f"Bearer {token}"},
         params=params,
         timeout=30,

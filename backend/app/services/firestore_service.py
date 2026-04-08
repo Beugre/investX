@@ -655,7 +655,7 @@ def get_all_active_alerts() -> list[dict[str, Any]]:
             .collection("users")
             .document(uid)
             .collection("price_alerts")
-            .where("triggered", "==", False)
+            .where(filter=FieldFilter("triggered", "==", False))
             .stream()
         )
         for d in docs:
