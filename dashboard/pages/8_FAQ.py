@@ -34,20 +34,20 @@ le long terme.
 """
     )
 
-with st.expander("Pourquoi USDC sur Binance et EUR sur Revolut X ?"):
+with st.expander("Quelles devises sont supportées sur chaque exchange ?"):
     st.markdown(
         """
-InvestX supporte deux exchanges avec des devises différentes :
+InvestX supporte deux exchanges avec plusieurs devises :
 
 **🟡 Binance – USDC** :
 - **Liquidité** : Les paires USDC sur Binance ont la meilleure liquidité
 - **Frais réduits** : Moins de spread et de slippage
 - Vous convertissez vos EUR en USDC avant de commencer le DCA
 
-**🔵 Revolut X – EUR** :
-- **Simplicité** : Achetez directement en euros
-- **0% de frais** sur les ordres maker
-- Transfert instantané depuis votre compte Revolut
+**🔵 Revolut X – EUR ou USDC** :
+- **EUR** : Achetez directement en euros, 0% de frais maker, transfert instantané depuis Revolut
+- **USDC** : Paires disponibles : `BTC-USDC`, `ETH-USDC`, `SOL-USDC`
+- Vous choisissez la devise (EUR ou USDC) lors de la configuration du DCA
 """
     )
 
@@ -56,7 +56,7 @@ with st.expander("Combien dois-je investir ?"):
         """
 Il n'y a **pas de montant minimum** imposé par InvestX.
 - **Binance** : minimum d'environ **5 USDC** par ordre.
-- **Revolut X** : minimum d'environ **1 EUR** par ordre.
+- **Revolut X** : minimum d'environ **1 EUR** (ou **1 USDC**) par ordre.
 
 **Recommandations :**
 - Investissez uniquement de l'argent que vous pouvez vous permettre de perdre
@@ -179,7 +179,7 @@ with st.expander("Pourquoi mon DCA n'a pas été exécuté ?"):
         """
 Causes possibles :
 
-1. **Solde insuffisant** – Vérifiez votre solde sur votre exchange (USDC sur Binance, EUR sur Revolut X)
+1. **Solde insuffisant** – Vérifiez votre solde sur votre exchange (USDC sur Binance, EUR ou USDC sur Revolut X)
 2. **Montant trop faible** – Minimum ~5 USDC (Binance) ou ~1 EUR (Revolut X)
 3. **Exchange déconnecté** – Vérifiez la page Intégrations
 4. **Abonnement inactif** – Vérifiez la page Subscription

@@ -153,7 +153,7 @@ with st.expander("4️⃣  Créer une clé API", expanded=False):
 # Étape 5 – Recharger en USDC
 # ═══════════════════════════════════════════
 with st.expander("5️⃣  Recharger votre compte en fonds", expanded=False):
-    tab_binance5, tab_revolut5 = st.tabs(["🟡 Binance (USDC)", "🔵 Revolut X (EUR)"])
+    tab_binance5, tab_revolut5 = st.tabs(["🟡 Binance (USDC)", "🔵 Revolut X (EUR / USDC)"])
 
     with tab_binance5:
         st.markdown(
@@ -179,24 +179,29 @@ with st.expander("5️⃣  Recharger votre compte en fonds", expanded=False):
     with tab_revolut5:
         st.markdown(
             """
-**Objectif** : avoir des euros disponibles sur votre compte **Cryptos · EUR** dans Revolut.
+**Objectif** : avoir des fonds disponibles sur votre compte **Revolut X**.
 
-⚠️ **Important** : Revolut X utilise un portefeuille **"Cryptos · EUR"** séparé de votre compte EUR principal. Il faut transférer des fonds vers ce portefeuille.
+⚠️ **Important** : Revolut X utilise un portefeuille séparé de votre compte Revolut principal. Il faut transférer des fonds vers ce portefeuille.
 
-**Comment faire :**
+**Option A – DCA en EUR :**
 1. Ouvrez l'app **Revolut**.
 2. Allez dans **Cryptos** → **Compte Cryptos · EUR**.
 3. Appuyez sur **Ajouter** ou **Transférer**.
 4. Sélectionnez votre **compte EUR principal** comme source.
 5. Entrez le montant à transférer (ex : 300 €) et confirmez.
 
-> ✅ Ce transfert est **instantané et gratuit** — c'est un simple virement interne entre vos comptes Revolut.
+**Option B – DCA en USDC :**
+1. Transférez de l'USDC vers votre compte Revolut X.
+2. Vous pouvez acheter de l'USDC directement dans l'app Revolut, ou en recevoir depuis un wallet externe.
+3. Les paires disponibles en USDC : `BTC-USDC`, `ETH-USDC`, `SOL-USDC`.
+
+> ✅ Les transferts internes Revolut sont **instantanés et gratuits**.
 >
-> 💡 Le bot InvestX achète en **EUR** depuis votre solde "Cryptos · EUR". Assurez-vous que ce solde est suffisant.
+> 💡 Le bot InvestX achète depuis votre solde Revolut X (EUR ou USDC selon la paire choisie). Assurez-vous que ce solde est suffisant.
 >
-> Par exemple, si votre DCA quotidien est de 10 €, prévoyez au moins **300 €** sur Cryptos · EUR pour un mois.
+> Par exemple, si votre DCA quotidien est de 10 €, prévoyez au moins **300 €** (ou 300 USDC) pour un mois.
 >
-> ⚠️ Avoir des EUR sur votre compte Revolut principal **ne suffit pas** — il faut les transférer vers "Cryptos · EUR".
+> ⚠️ Avoir des fonds sur votre compte Revolut principal **ne suffit pas** — il faut les transférer vers Revolut X.
 """
         )
 
@@ -253,8 +258,9 @@ with st.expander("7️⃣  Configurer votre DCA", expanded=False):
 2. Configurez les paramètres :
    - **Trading Pair** : la crypto à acheter
      - *Binance* : `BTCUSDC`, `ETHUSDC`, `SOLUSDC`, `BNBUSDC`, `ADAUSDC`
-     - *Revolut X* : `BTC-EUR`, `ETH-EUR`, `SOL-EUR`, `BNB-EUR`, `ADA-EUR`
-   - **Amount** : montant à investir chaque jour (ex : `10` en USDC pour Binance, `10` en EUR pour Revolut X)
+     - *Revolut X (EUR)* : `BTC-EUR`, `ETH-EUR`, `SOL-EUR`, `BNB-EUR`, `ADA-EUR`
+     - *Revolut X (USDC)* : `BTC-USDC`, `ETH-USDC`, `SOL-USDC`
+   - **Amount** : montant à investir chaque jour (ex : `10` en USDC pour Binance, `10` en EUR ou USDC pour Revolut X)
    - **Frequency** : fréquence d'achat (`daily` = une fois par jour)
    - **Execution Time** : heure d'exécution (format UTC, ex : `14:00`)
    - **Enabled** : activez le bot ✅
