@@ -27,10 +27,14 @@ def _get_fernet() -> Fernet:
     if _fernet is None:
         raw_key = os.environ.get("ENCRYPTION_KEY", "")
         if not raw_key:
-            # Auto-générer une clé déterministe à partir du project ID (fallback)
             from app.config import settings
-            raw_key = settings.firebase_project_id + "-investx-secret-key"
-            logger.warning("ENCRYPTION_KEY not set, using derived key (set it in .env for production)")
+            if settings.app_env == "production":
+                raise SecretManagerError(
+                    "ENCRYPTION_KEY not set in production – cannot start safely"
+                )
+            # Dev-only fallback (non-déterministe, utilise un secret local)
+            raw_key = "dev-only-key-not-for-production-" + settings.firebase_project_id
+            logger.warning("ENCRYPTION_KEY not set, using dev-only derived key")
         # Dériver une clé Fernet valide (32 bytes base64) depuis n'importe quelle chaîne
         key_bytes = hashlib.sha256(raw_key.encode()).digest()
         fernet_key = base64.urlsafe_b64encode(key_bytes)

@@ -437,7 +437,9 @@ def get_spending_record(uid: str, period_key: str) -> dict[str, Any] | None:
 
 
 def increment_spending(uid: str, period_key: str, amount: float) -> None:
-    """Incrémente le montant dépensé pour une période."""
+    """Incrémente le montant dépensé pour une période (atomique)."""
+    from google.cloud.firestore_v1 import transforms
+
     ref = (
         _db()
         .collection("users")
@@ -447,8 +449,10 @@ def increment_spending(uid: str, period_key: str, amount: float) -> None:
     )
     doc = ref.get()
     if doc.exists:
-        current = doc.to_dict().get("amount", 0.0)
-        ref.update({"amount": current + amount, "updated_at": datetime.now(timezone.utc)})
+        ref.update({
+            "amount": transforms.Increment(amount),
+            "updated_at": datetime.now(timezone.utc),
+        })
     else:
         ref.set({
             "period_key": period_key,
@@ -581,3 +585,140 @@ def list_dca_cycle_logs(uid: str, limit: int = 30) -> list[dict[str, Any]]:
         .stream()
     )
     return [{"log_id": d.id, **d.to_dict()} for d in docs]
+
+
+# ══════════════════════════════════════════════════════
+# Alertes de prix
+# ══════════════════════════════════════════════════════
+
+def list_price_alerts(uid: str) -> list[dict[str, Any]]:
+    """Liste les alertes de prix d'un utilisateur."""
+    docs = (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("price_alerts")
+        .order_by("created_at", direction="DESCENDING")
+        .stream()
+    )
+    result = []
+    for d in docs:
+        data = d.to_dict()
+        data["id"] = d.id
+        result.append(data)
+    return result
+
+
+def create_price_alert(
+    uid: str, symbol: str, target_price: float, direction: str
+) -> dict[str, Any]:
+    """Crée une alerte de prix."""
+    ref = (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("price_alerts")
+        .document()
+    )
+    data = {
+        "symbol": symbol,
+        "target_price": target_price,
+        "direction": direction,
+        "triggered": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    ref.set(data)
+    data["id"] = ref.id
+    return data
+
+
+def delete_price_alert(uid: str, alert_id: str) -> None:
+    """Supprime une alerte de prix."""
+    (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("price_alerts")
+        .document(alert_id)
+        .delete()
+    )
+
+
+def get_all_active_alerts() -> list[dict[str, Any]]:
+    """Récupère toutes les alertes non déclenchées de tous les utilisateurs."""
+    users = get_all_active_users()
+    alerts = []
+    for user in users:
+        uid = user["uid"]
+        docs = (
+            _db()
+            .collection("users")
+            .document(uid)
+            .collection("price_alerts")
+            .where("triggered", "==", False)
+            .stream()
+        )
+        for d in docs:
+            data = d.to_dict()
+            data["id"] = d.id
+            data["uid"] = uid
+            alerts.append(data)
+    return alerts
+
+
+def mark_alert_triggered(uid: str, alert_id: str) -> None:
+    """Marque une alerte comme déclenchée."""
+    (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("price_alerts")
+        .document(alert_id)
+        .update({
+            "triggered": True,
+            "triggered_at": datetime.now(timezone.utc).isoformat(),
+        })
+    )
+
+
+# ══════════════════════════════════════════════════════
+# Take-Profit configuration
+# ══════════════════════════════════════════════════════
+
+def get_take_profit_config(uid: str) -> dict[str, Any] | None:
+    """Récupère la configuration take-profit d'un utilisateur."""
+    doc = (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("take_profit")
+        .document("config")
+        .get()
+    )
+    return doc.to_dict() if doc.exists else None
+
+
+def update_take_profit_config(uid: str, data: dict[str, Any]) -> None:
+    """Met à jour la configuration take-profit."""
+    data["updated_at"] = datetime.now(timezone.utc)
+    (
+        _db()
+        .collection("users")
+        .document(uid)
+        .collection("take_profit")
+        .document("config")
+        .set(data, merge=True)
+    )
+
+
+def get_all_take_profit_configs() -> list[dict[str, Any]]:
+    """Récupère les configs take-profit actives de tous les utilisateurs."""
+    users = get_all_active_users()
+    configs = []
+    for user in users:
+        uid = user["uid"]
+        tp = get_take_profit_config(uid)
+        if tp and tp.get("enabled") and tp.get("rules"):
+            tp["uid"] = uid
+            configs.append(tp)
+    return configs

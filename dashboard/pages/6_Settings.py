@@ -5,7 +5,7 @@ Page 6 – Paramètres généraux.
 import streamlit as st
 
 from components.auth_guard import require_auth, get_email, get_uid
-from services.api_client import get_user_profile, update_user_profile
+from services.api_client import get_user_profile, update_user_profile, list_alerts, create_alert, delete_alert
 
 st.set_page_config(page_title="Settings – InvestX", page_icon="🛠")
 st.title("🛠 Paramètres")
@@ -50,6 +50,54 @@ st.divider()
 st.subheader("Timezone")
 st.info("Timezone par défaut : **Europe/Paris**")
 st.caption("La modification de timezone sera disponible dans une prochaine version.")
+
+st.divider()
+
+st.subheader("🔔 Alertes de prix")
+st.caption("Recevez une notification Telegram quand un prix est atteint.")
+
+ALERT_SYMBOLS = [
+    "BTCUSDC", "ETHUSDC", "SOLUSDC", "BNBUSDC", "ADAUSDC",
+    "BTC-EUR", "ETH-EUR", "SOL-EUR", "BNB-EUR", "ADA-EUR",
+    "BTC-USDC", "ETH-USDC", "SOL-USDC",
+]
+
+with st.form("alert_form"):
+    col_s, col_p, col_d = st.columns([2, 2, 1])
+    with col_s:
+        alert_symbol = st.selectbox("Paire", ALERT_SYMBOLS, key="alert_sym")
+    with col_p:
+        alert_price = st.number_input("Prix cible", min_value=0.01, step=10.0, key="alert_px")
+    with col_d:
+        alert_dir = st.selectbox("Direction", ["above", "below"], format_func=lambda x: "📈 Au-dessus" if x == "above" else "📉 En-dessous", key="alert_dir")
+    if st.form_submit_button("➕ Créer l'alerte"):
+        try:
+            create_alert(token, alert_symbol, alert_price, alert_dir)
+            st.success("✅ Alerte créée !")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Erreur : {e}")
+
+try:
+    alerts = list_alerts(token)
+    if alerts:
+        for a in alerts:
+            icon = "📈" if a.get("direction") == "above" else "📉"
+            status = "✅ Déclenchée" if a.get("triggered") else "⏳ Active"
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"{icon} **{a.get('symbol')}** — {a.get('target_price', 0):,.2f} ({status})")
+            with col2:
+                if not a.get("triggered") and st.button("🗑️", key=f"del_{a.get('id')}"):
+                    try:
+                        delete_alert(token, a["id"])
+                        st.rerun()
+                    except Exception as e:
+                        st.error(str(e))
+    else:
+        st.info("Aucune alerte configurée.")
+except Exception as e:
+    st.warning(f"Impossible de charger les alertes : {e}")
 
 st.divider()
 

@@ -6,7 +6,7 @@ Endpoints DCA config :
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.auth_firebase import get_current_uid
 from app.schemas.dca import (
@@ -43,7 +43,11 @@ async def update_dca_config(
     uid: str = Depends(get_current_uid),
 ):
     """Met à jour la configuration DCA."""
+    from app.core.constants import ALLOWED_SYMBOLS
     data = payload.model_dump()
+    if data.get("symbol") and data["symbol"] not in ALLOWED_SYMBOLS:
+        from app.core.exceptions import BadRequest
+        raise BadRequest(f"Symbol '{data['symbol']}' not allowed")
     firestore_service.update_dca_config(uid, data)
     return DCAConfigRead(**data)
 
@@ -222,3 +226,64 @@ async def simulate_dca_v2(payload: SimulationRequest):
         spending_caps=payload.spending_caps.model_dump() if payload.spending_caps else None,
     )
     return SimulationResponse(**result)
+
+
+# ══════════════════════════════════════════════════════
+# Take-Profit (DCA exit)
+# ══════════════════════════════════════════════════════
+
+from pydantic import BaseModel, Field
+
+
+class TakeProfitRule(BaseModel):
+    symbol: str = Field(..., examples=["BTCUSDC"])
+    target_price: float = Field(..., gt=0)
+    sell_pct: float = Field(50.0, ge=1, le=100, description="% du holding à vendre")
+
+
+class TakeProfitConfigUpdate(BaseModel):
+    enabled: bool = False
+    rules: list[TakeProfitRule] = []
+
+
+@router.get("/v2/take-profit")
+async def get_take_profit_config(uid: str = Depends(get_current_uid)):
+    """Retourne la configuration take-profit."""
+    tp = firestore_service.get_take_profit_config(uid)
+    return tp or {"enabled": False, "rules": []}
+
+
+@router.put("/v2/take-profit")
+async def update_take_profit_config(
+    payload: TakeProfitConfigUpdate,
+    uid: str = Depends(get_current_uid),
+):
+    """Met à jour la configuration take-profit."""
+    from app.core.constants import ALLOWED_SYMBOLS
+    from app.core.exceptions import BadRequest
+    for rule in payload.rules:
+        if rule.symbol not in ALLOWED_SYMBOLS:
+            raise BadRequest(f"Symbol '{rule.symbol}' not allowed")
+    data = payload.model_dump()
+    firestore_service.update_take_profit_config(uid, data)
+    return data
+
+
+# ══════════════════════════════════════════════════════
+# Backtesting
+# ══════════════════════════════════════════════════════
+
+@router.get("/v2/backtest")
+async def backtest_dca_v2(
+    base_daily_amount: float = Query(12.0, gt=0),
+    days: int = Query(365, ge=30, le=1095),
+    symbol: str = Query("BTCUSDC"),
+):
+    """Backtesting de la stratégie RSI v2 sur données historiques.
+    Endpoint public (pas besoin d'auth).
+    """
+    from app.core.constants import ALLOWED_SYMBOLS
+    from app.core.exceptions import BadRequest
+    if symbol not in ALLOWED_SYMBOLS:
+        raise BadRequest(f"Symbol '{symbol}' not allowed")
+    return dca_service.backtest_rsi_v2(base_daily_amount, days, symbol)

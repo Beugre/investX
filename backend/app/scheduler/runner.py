@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.dca_service import run_cycle
 from app.scheduler.jobs import portfolio_refresh_job
 from app.scheduler.health_job import health_check_job
+from app.scheduler.alerts_job import check_price_alerts_job
+from app.scheduler.take_profit_job import check_take_profit_job
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -42,8 +44,24 @@ def start_scheduler() -> None:
         replace_existing=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        check_price_alerts_job,
+        trigger="interval",
+        minutes=1,
+        id="price_alerts",
+        replace_existing=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        check_take_profit_job,
+        trigger="interval",
+        minutes=1,
+        id="take_profit",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
-    logger.info("Scheduler started (DCA cycle + portfolio refresh + health check)")
+    logger.info("Scheduler started (DCA + portfolio + health + alerts + take-profit)")
 
 
 def stop_scheduler() -> None:

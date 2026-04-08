@@ -4,7 +4,8 @@ Endpoints Telegram : /telegram/link, /telegram/test, /telegram/settings
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+import hmac
 
 from app.core.auth_firebase import get_current_uid
 from app.schemas.telegram import (
@@ -69,3 +70,16 @@ async def update_telegram_settings(
     data = payload.model_dump()
     firestore_service.update_telegram_settings(uid, data)
     return TelegramSettingsRead(**{**data, **(firestore_service.get_telegram_settings(uid) or {})})
+
+
+@router.post("/webhook/{secret}")
+async def telegram_webhook(secret: str, request: Request):
+    """Reçoit les updates Telegram via webhook."""
+    from app.services.telegram_bot import WEBHOOK_SECRET, handle_webhook_update
+
+    if not hmac.compare_digest(secret, WEBHOOK_SECRET):
+        return {"ok": False}
+
+    update = await request.json()
+    await handle_webhook_update(update)
+    return {"ok": True}

@@ -125,7 +125,13 @@ async def _delete_webhook() -> None:
 
 
 def start_bot() -> None:
-    """Démarre le polling Telegram dans une tâche asyncio."""
+    """Démarre le bot Telegram en mode polling ou webhook."""
+    if settings.telegram_webhook_mode:
+        logger.info("Telegram bot in WEBHOOK mode – polling disabled")
+        loop = asyncio.get_event_loop()
+        loop.create_task(_setup_webhook())
+        return
+
     global _polling_task
     _should_stop.clear()
 
@@ -148,3 +154,34 @@ async def stop_bot() -> None:
             pass
         _polling_task = None
     logger.info("Telegram bot stopped")
+
+
+# ── Mode Webhook ──
+
+import secrets
+
+WEBHOOK_SECRET = secrets.token_urlsafe(32)
+
+
+async def _setup_webhook() -> None:
+    """Configure le webhook Telegram vers notre endpoint."""
+    webhook_url = f"{settings.app_base_url}/telegram/webhook/{WEBHOOK_SECRET}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{TELEGRAM_API}/setWebhook",
+                json={"url": webhook_url, "allowed_updates": ["message"]},
+            )
+            if resp.status_code == 200:
+                logger.info("Telegram webhook set to %s", webhook_url)
+            else:
+                logger.error("setWebhook failed: %s", resp.text)
+    except Exception as e:
+        logger.error("Failed to set webhook: %s", e)
+
+
+async def handle_webhook_update(update: dict) -> None:
+    """Traite un update reçu via webhook."""
+    message = update.get("message")
+    if message:
+        await _handle_message(message)

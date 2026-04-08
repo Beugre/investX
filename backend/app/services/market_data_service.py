@@ -28,6 +28,31 @@ logger = get_logger(__name__)
 
 
 # ══════════════════════════════════════════════════════
+# Cache TTL simple pour éviter les appels API répétitifs
+# ══════════════════════════════════════════════════════
+
+_cache: dict[str, tuple[float, Any]] = {}  # key -> (expire_ts, value)
+
+
+def _cache_get(key: str) -> Any | None:
+    """Récupère une valeur du cache si elle n'a pas expiré."""
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    expire_ts, value = entry
+    if datetime.now(timezone.utc).timestamp() > expire_ts:
+        del _cache[key]
+        return None
+    return value
+
+
+def _cache_set(key: str, value: Any, ttl_seconds: int = 3600) -> None:
+    """Stocke une valeur dans le cache avec un TTL."""
+    expire_ts = datetime.now(timezone.utc).timestamp() + ttl_seconds
+    _cache[key] = (expire_ts, value)
+
+
+# ══════════════════════════════════════════════════════
 # RSI (Relative Strength Index)
 # ══════════════════════════════════════════════════════
 
@@ -150,11 +175,20 @@ async def fetch_mvrv_ratio(asset: str = "btc") -> float | None:
 
 
 def fetch_mvrv_ratio_sync(asset: str = "btc") -> float | None:
-    """Récupère le MVRV ratio (version sync – safe pour scheduler threads)."""
+    """Récupère le MVRV ratio (version sync – safe pour scheduler threads).
+    Résultat caché 1h car le MVRV change ~1x/jour.
+    """
+    cache_key = f"mvrv_{asset}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
         url = _build_mvrv_url(asset)
         response = httpx.get(url, timeout=15)
-        return _parse_mvrv_response(response, asset)
+        result = _parse_mvrv_response(response, asset)
+        if result is not None:
+            _cache_set(cache_key, result, ttl_seconds=3600)
+        return result
     except Exception as e:
         logger.error("Failed to fetch MVRV from CoinMetrics (sync): %s", e)
         return None

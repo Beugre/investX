@@ -1,12 +1,15 @@
 """
-Endpoints Portfolio : /portfolio/summary, /portfolio/history, /orders
+Endpoints Portfolio : /portfolio/summary, /portfolio/history, /orders, /orders/export
 """
 
 from __future__ import annotations
 
+import csv
+import io
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from app.core.auth_firebase import get_current_uid
 from app.schemas.portfolio import PortfolioSummary, PortfolioSnapshot, OrderRead
@@ -66,3 +69,37 @@ async def get_latest_order(
     if not order:
         return None
     return OrderRead(**order)
+
+
+@router.get("/orders/export")
+async def export_orders_csv(
+    uid: str = Depends(get_current_uid),
+    symbol: str | None = Query(None),
+    limit: int = Query(500, ge=1, le=5000),
+):
+    """Exporte les ordres en CSV."""
+    orders = firestore_service.list_orders(uid, limit=limit, symbol=symbol)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "date", "symbol", "side", "quantity", "price",
+        "amount_eur", "commission", "order_type", "exchange",
+    ])
+    for o in orders:
+        writer.writerow([
+            o.get("created_at", ""),
+            o.get("symbol", ""),
+            o.get("side", "BUY"),
+            o.get("quantity", 0),
+            o.get("price", 0),
+            o.get("amount_eur", 0),
+            o.get("commission", o.get("fees_usd", 0)),
+            o.get("order_type", "market"),
+            o.get("exchange", ""),
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=investx_orders.csv"},
+    )

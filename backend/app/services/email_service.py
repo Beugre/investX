@@ -180,10 +180,16 @@ def send_v2_order_email(
     btc_amount: float, eth_amount: float,
     crash_amount: float, crash_levels: list[str],
     orders: list[dict],
+    pair_orders: list[dict] | None = None,
 ) -> bool:
     """Envoie un email récapitulatif d'un cycle DCA RSI v2."""
     now = datetime.now(pytz.timezone("Europe/Paris")).strftime("%d %B %Y %H:%M GMT")
-    total = btc_amount + eth_amount + crash_amount
+
+    # Calculer le total depuis pair_orders si disponible, sinon btc+eth+crash
+    if pair_orders:
+        total = sum(p.get("amount", 0) for p in pair_orders) + crash_amount
+    else:
+        total = btc_amount + eth_amount + crash_amount
 
     # Détecter devise à partir des ordres
     any_eur = any("EUR" in o.get("symbol", "") for o in orders)

@@ -26,6 +26,9 @@ from services.api_client import (
     get_dca_v2_auto_config,
     simulate_dca_v2,
     get_active_exchange,
+    get_take_profit_config,
+    update_take_profit_config,
+    backtest_dca_v2,
 )
 
 st.set_page_config(page_title="DCA Config – InvestX", page_icon="⚙️", layout="wide")
@@ -675,3 +678,109 @@ with st.expander("🚨 Crash Reserve"):
             st.write(f"Niveaux déclenchés : {', '.join(reserve['levels_triggered'])}")
     except Exception as e:
         st.info(f"Crash reserve indisponible : {e}")
+
+# ── Take-Profit ──
+with st.expander("💰 Take-Profit (sortie automatique)"):
+    st.caption("Configurez des ordres de vente automatiques quand le prix atteint vos objectifs.")
+
+    tp_config = {}
+    try:
+        tp_config = get_take_profit_config(token)
+    except Exception:
+        pass
+
+    tp_enabled = st.checkbox(
+        "Activer le take-profit",
+        value=tp_config.get("enabled", False),
+        key="tp_enabled",
+    )
+
+    existing_rules = tp_config.get("rules", [])
+
+    # Afficher les règles existantes
+    if existing_rules:
+        st.markdown("**Règles actives :**")
+        for i, rule in enumerate(existing_rules):
+            st.write(
+                f"• **{rule.get('symbol')}** → Vente de {rule.get('sell_pct', 50):.0f}% "
+                f"si prix ≥ {currency_symbol}{rule.get('target_price', 0):,.2f}"
+            )
+
+    # Formulaire pour ajouter une règle
+    with st.form("tp_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            all_pairs = v2_pairs if exchange_detected else BINANCE_PAIRS
+            tp_symbol = st.selectbox("Paire", all_pairs, key="tp_sym")
+        with col2:
+            tp_price = st.number_input("Prix cible", min_value=1.0, step=100.0, key="tp_price")
+        with col3:
+            tp_pct = st.slider("% à vendre", 10, 100, 50, step=10, key="tp_pct")
+
+        submitted = st.form_submit_button("💾 Enregistrer")
+        if submitted:
+            new_rules = existing_rules + [{
+                "symbol": tp_symbol,
+                "target_price": tp_price,
+                "sell_pct": tp_pct,
+            }]
+            try:
+                update_take_profit_config(token, {
+                    "enabled": tp_enabled,
+                    "rules": new_rules,
+                })
+                st.success("✅ Take-profit mis à jour !")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Erreur : {e}")
+
+# ── Backtesting ──
+with st.expander("📊 Backtesting (simulation historique)"):
+    st.caption("Simulez la stratégie RSI v2 sur les données historiques réelles.")
+    col_bt1, col_bt2, col_bt3 = st.columns(3)
+    with col_bt1:
+        bt_amount = st.number_input(
+            "Montant journalier (€/$)", min_value=1.0, value=12.0, step=1.0, key="bt_amt"
+        )
+    with col_bt2:
+        bt_days = st.selectbox("Période", [90, 180, 365, 730], index=2, key="bt_days")
+    with col_bt3:
+        bt_sym = st.selectbox(
+            "Paire", ["BTCUSDC", "ETHUSDC", "SOLUSDC", "BNBUSDC"], key="bt_sym"
+        )
+
+    if st.button("▶️ Lancer le backtest", key="bt_run"):
+        with st.spinner("Calcul en cours..."):
+            try:
+                result = backtest_dca_v2(bt_amount, bt_days, bt_sym)
+                summary = result.get("summary", {})
+
+                if result.get("error"):
+                    st.error(result["error"])
+                else:
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Total investi", f"{summary.get('total_invested', 0):,.2f}")
+                    c2.metric("Valeur actuelle", f"{summary.get('market_value', 0):,.2f}")
+                    pnl = summary.get("pnl", 0)
+                    pnl_pct = summary.get("pnl_pct", 0)
+                    c3.metric("PnL", f"{pnl:+,.2f}", delta=f"{pnl_pct:+.1f}%")
+                    c4.metric("Prix moyen achat", f"{summary.get('avg_buy_price', 0):,.2f}")
+
+                    st.write(
+                        f"📅 {summary.get('days_simulated', 0)} jours simulés, "
+                        f"{summary.get('days_bought', 0)} jours d'achat"
+                    )
+
+                    daily = result.get("daily_data", [])
+                    if daily:
+                        df_bt = pd.DataFrame(daily)
+                        df_bt["date"] = pd.to_datetime(df_bt["date"])
+
+                        tab1, tab2 = st.tabs(["📈 Prix & Achats", "📊 RSI"])
+                        with tab1:
+                            st.line_chart(df_bt.set_index("date")[["price"]])
+                            st.bar_chart(df_bt.set_index("date")[["amount"]])
+                        with tab2:
+                            st.line_chart(df_bt.set_index("date")[["rsi"]])
+            except Exception as e:
+                st.error(f"Erreur backtesting : {e}")

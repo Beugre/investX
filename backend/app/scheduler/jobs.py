@@ -19,21 +19,42 @@ def dca_job() -> None:
 
 
 def portfolio_refresh_job() -> None:
-    """Rafraîchit les snapshots portfolio (prix, PnL) pour tous les utilisateurs actifs."""
+    """Rafraîchit les snapshots portfolio (prix, PnL) pour tous les utilisateurs actifs.
+    Supporte à la fois le DCA v1 (une paire) et le DCA v2 (multi-paires).
+    """
     try:
         users = firestore_service.get_all_active_users()
         refreshed = 0
         for user in users:
             uid = user["uid"]
-            config = firestore_service.get_dca_config(uid)
-            if not config or not config.get("enabled"):
-                continue
-            symbol = config.get("symbol", "BTCUSDC")
-            try:
-                portfolio_service.refresh_snapshot(uid, symbol)
-                refreshed += 1
-            except Exception as e:
-                logger.warning("Portfolio refresh failed for %s: %s", uid, e)
+            symbols_to_refresh: set[str] = set()
+
+            # v2 multi-paires
+            v2_config = firestore_service.get_dca_v2_config(uid)
+            if v2_config and v2_config.get("enabled"):
+                pairs = v2_config.get("pairs") or []
+                for p in pairs:
+                    sym = p.get("symbol") if isinstance(p, dict) else None
+                    if sym:
+                        symbols_to_refresh.add(sym)
+                # Fallback BTC/ETH si pas de paires custom
+                if not symbols_to_refresh:
+                    quote = v2_config.get("quote_currency", "USDC")
+                    from app.core.constants import DCA_V2_VALID_PAIRS
+                    vp = DCA_V2_VALID_PAIRS.get(quote, DCA_V2_VALID_PAIRS["USDC"])
+                    symbols_to_refresh.update(vp.values())
+            else:
+                # v1
+                config = firestore_service.get_dca_config(uid)
+                if config and config.get("enabled"):
+                    symbols_to_refresh.add(config.get("symbol", "BTCUSDC"))
+
+            for symbol in symbols_to_refresh:
+                try:
+                    portfolio_service.refresh_snapshot(uid, symbol)
+                    refreshed += 1
+                except Exception as e:
+                    logger.warning("Portfolio refresh failed for %s/%s: %s", uid, symbol, e)
         if refreshed:
             logger.info("Portfolio refresh completed: %d snapshots updated", refreshed)
     except Exception as e:

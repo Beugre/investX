@@ -31,6 +31,8 @@ from app.api.stripe import router as stripe_router
 from app.api.telegram import router as telegram_router
 from app.api.portfolio import router as portfolio_router
 from app.api.auth import router as internal_router
+from app.api.alerts import router as alerts_router
+from app.api.admin import router as admin_router
 
 logger = get_logger(__name__)
 
@@ -103,6 +105,8 @@ app.include_router(stripe_router)
 app.include_router(telegram_router)
 app.include_router(portfolio_router)
 app.include_router(internal_router)
+app.include_router(alerts_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

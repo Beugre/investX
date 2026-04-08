@@ -656,6 +656,7 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
     _send_v2_email(
         uid, rsi, rsi_label, regime, btc_amount, eth_amount,
         crash_amount, crash_levels_triggered, orders_executed,
+        pair_orders=pair_orders,
     )
 
     # Refresh snapshots
@@ -684,50 +685,66 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
 def _place_order_safe(
     uid: str, creds: dict, symbol: str, amount: float, source: str,
     exchange: str = "binance", *, errors_out: list[str] | None = None,
+    max_retries: int = 2,
 ) -> dict | None:
-    """Place un ordre et enregistre. Retourne None en cas d'échec."""
-    try:
-        order_data = _place_exchange_order(exchange, creds, symbol, amount)
-        order_data["executed_at"] = _now_utc()
-        order_data["source"] = source
-        order_id = firestore_service.save_order(uid, order_data)
-        order_data["order_id"] = order_id
-        return order_data
-    except (BinanceError, ExchangeError) as e:
-        logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
-        audit_service.log_dca_failed(uid, symbol, e.message)
-        if errors_out is not None:
-            errors_out.append(f"{symbol}: {e.message}")
-        err_upper = str(e.message).upper()
-        if "NOTIONAL" in err_upper:
-            user_msg = (
-                f"⚠️ Montant trop faible pour {symbol}.\n"
-                f"Minimum de 5 € par ordre requis.\n\n"
-                f"👉 Augmentez votre montant DCA de base dans le dashboard."
-            )
-        elif exchange == "revolutx" and (
-            "INSUFFICIENT" in err_upper or "BALANCE" in err_upper
-            or "FUNDS" in err_upper or "NOT_ENOUGH" in err_upper
-        ):
-            user_msg = (
-                f"⚠️ Solde Revolut X insuffisant pour {symbol}.\n\n"
-                f"💰 **Important** : Revolut X utilise un portefeuille \"Cryptos · EUR\" séparé de votre compte EUR principal.\n\n"
-                f"👉 **Comment recharger :**\n"
-                f"1. Ouvrez l'app Revolut\n"
-                f"2. Allez dans **Cryptos** → **Compte Cryptos · EUR**\n"
-                f"3. Appuyez sur **Ajouter** ou **Transférer**\n"
-                f"4. Transférez des EUR depuis votre compte principal vers Cryptos · EUR\n\n"
-                f"💡 Ce transfert est instantané et gratuit."
-            )
-        elif "INSUFFICIENT" in err_upper or "BALANCE" in err_upper or "FUNDS" in err_upper:
-            user_msg = (
-                f"⚠️ Solde insuffisant pour {symbol}.\n"
-                f"👉 Rechargez votre compte en USDC sur Binance."
-            )
-        else:
-            user_msg = f"Ordre DCA v2 échoué ({symbol}): {e.message}"
-        _send_error_telegram(uid, user_msg)
-        return None
+    """Place un ordre et enregistre. Retry automatique sur erreurs réseau."""
+    import time
+
+    for attempt in range(max_retries + 1):
+        try:
+            order_data = _place_exchange_order(exchange, creds, symbol, amount)
+            order_data["executed_at"] = _now_utc()
+            order_data["source"] = source
+            order_id = firestore_service.save_order(uid, order_data)
+            order_data["order_id"] = order_id
+            return order_data
+        except (BinanceError, ExchangeError) as e:
+            err_upper = str(e.message).upper()
+            # Erreurs métier : pas de retry
+            is_business_error = any(kw in err_upper for kw in [
+                "NOTIONAL", "INSUFFICIENT", "BALANCE", "FUNDS", "NOT_ENOUGH",
+                "MIN_AMOUNT", "LOT_SIZE",
+            ])
+            if is_business_error or attempt >= max_retries:
+                logger.error("DCA v2 order failed for %s on %s: %s", uid, symbol, e.message)
+                audit_service.log_dca_failed(uid, symbol, e.message)
+                if errors_out is not None:
+                    errors_out.append(f"{symbol}: {e.message}")
+                if "NOTIONAL" in err_upper:
+                    user_msg = (
+                        f"⚠️ Montant trop faible pour {symbol}.\n"
+                        f"Minimum de 5 € par ordre requis.\n\n"
+                        f"👉 Augmentez votre montant DCA de base dans le dashboard."
+                    )
+                elif exchange == "revolutx" and (
+                    "INSUFFICIENT" in err_upper or "BALANCE" in err_upper
+                    or "FUNDS" in err_upper or "NOT_ENOUGH" in err_upper
+                ):
+                    user_msg = (
+                        f"⚠️ Solde Revolut X insuffisant pour {symbol}.\n\n"
+                        f"💰 **Important** : Revolut X utilise un portefeuille \"Cryptos · EUR\" séparé de votre compte EUR principal.\n\n"
+                        f"👉 **Comment recharger :**\n"
+                        f"1. Ouvrez l'app Revolut\n"
+                        f"2. Allez dans **Cryptos** → **Compte Cryptos · EUR**\n"
+                        f"3. Appuyez sur **Ajouter** ou **Transférer**\n"
+                        f"4. Transférez des EUR depuis votre compte principal vers Cryptos · EUR\n\n"
+                        f"💡 Ce transfert est instantané et gratuit."
+                    )
+                elif "INSUFFICIENT" in err_upper or "BALANCE" in err_upper or "FUNDS" in err_upper:
+                    user_msg = (
+                        f"⚠️ Solde insuffisant pour {symbol}.\n"
+                        f"👉 Rechargez votre compte en USDC sur Binance."
+                    )
+                else:
+                    user_msg = f"Ordre DCA v2 échoué ({symbol}): {e.message}"
+                _send_error_telegram(uid, user_msg)
+                return None
+            # Erreur réseau/temporaire : retry avec backoff
+            wait = 2 ** attempt
+            logger.warning("DCA order retry %d/%d for %s %s (wait %ds)",
+                           attempt + 1, max_retries, uid, symbol, wait)
+            time.sleep(wait)
+    return None
 
 
 def _save_cycle_log(
@@ -1054,6 +1071,7 @@ def _send_v2_email(
     btc_amount: float, eth_amount: float,
     crash_amount: float, crash_levels: list[str],
     orders: list[dict],
+    pair_orders: list[dict] | None = None,
 ) -> None:
     """Envoie un email récapitulatif DCA v2 (fire-and-forget)."""
     email = _get_user_email(uid)
@@ -1064,6 +1082,7 @@ def _send_v2_email(
             email, rsi, rsi_label, regime,
             btc_amount, eth_amount,
             crash_amount, crash_levels, orders,
+            pair_orders=pair_orders,
         )
     except Exception as e:
         logger.warning("Failed to send v2 email to %s: %s", email, e)
@@ -1193,3 +1212,136 @@ def run_cycle() -> int:
 
     logger.info("DCA cycle complete: %d orders executed", executed)
     return executed
+
+
+# ══════════════════════════════════════════════════════
+# Backtesting RSI v2
+# ══════════════════════════════════════════════════════
+
+def backtest_rsi_v2(
+    base_daily_amount: float,
+    days: int = 365,
+    symbol: str = "BTCUSDC",
+) -> dict[str, Any]:
+    """Simule la stratégie RSI v2 sur données historiques Binance.
+
+    Retourne :
+      - daily_data : list[dict] avec date, prix, RSI, montant investi, qty achetée
+      - summary : totaux, PnL
+    """
+    import httpx
+
+    # Récupérer les klines historiques
+    binance_symbol = symbol.replace("-", "")
+    url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit={days}"
+    try:
+        resp = httpx.get(url, timeout=15)
+        resp.raise_for_status()
+        klines = resp.json()
+    except Exception as e:
+        logger.error("Backtest: failed to fetch klines: %s", e)
+        return {"error": str(e), "daily_data": [], "summary": {}}
+
+    if len(klines) < 15:
+        return {"error": "Pas assez de données", "daily_data": [], "summary": {}}
+
+    closes = [float(k[4]) for k in klines]
+    dates = [k[0] for k in klines]  # open_time ms
+
+    # Calculer RSI pour chaque jour (RSI-14)
+    def compute_rsi_series(prices: list[float], period: int = 14) -> list[float | None]:
+        rsi_values: list[float | None] = [None] * len(prices)
+        if len(prices) < period + 1:
+            return rsi_values
+        gains = []
+        losses = []
+        for i in range(1, len(prices)):
+            delta = prices[i] - prices[i - 1]
+            gains.append(max(delta, 0))
+            losses.append(max(-delta, 0))
+
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        if avg_loss == 0:
+            rsi_values[period] = 100.0
+        else:
+            rs = avg_gain / avg_loss
+            rsi_values[period] = 100 - (100 / (1 + rs))
+
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+            if avg_loss == 0:
+                rsi_values[i + 1] = 100.0
+            else:
+                rs = avg_gain / avg_loss
+                rsi_values[i + 1] = 100 - (100 / (1 + rs))
+        return rsi_values
+
+    rsi_series = compute_rsi_series(closes)
+
+    brackets = DEFAULT_RSI_BRACKETS
+    thresholds = DEFAULT_MVRV_THRESHOLDS
+    default_mvrv_mult = 1.0  # On ne peut pas avoir le MVRV historique facilement
+
+    daily_data = []
+    total_invested = 0.0
+    total_qty = 0.0
+
+    for i in range(len(closes)):
+        rsi = rsi_series[i]
+        price = closes[i]
+        date_ms = dates[i]
+        from datetime import datetime as dt
+        date_str = dt.utcfromtimestamp(date_ms / 1000).strftime("%Y-%m-%d")
+
+        if rsi is None:
+            daily_data.append({
+                "date": date_str, "price": price, "rsi": None,
+                "amount": 0, "quantity": 0,
+            })
+            continue
+
+        # Trouver le bracket RSI correspondant
+        rsi_mult = 0.0
+        rsi_label = "OVERBOUGHT"
+        for b in sorted(brackets, key=lambda x: x.get("max_rsi", 100)):
+            if rsi <= b.get("max_rsi", 100):
+                rsi_mult = b["multiplier"]
+                rsi_label = b["label"]
+                break
+
+        amount = round(base_daily_amount * rsi_mult * default_mvrv_mult, 2)
+        qty = amount / price if price > 0 else 0
+
+        total_invested += amount
+        total_qty += qty
+
+        daily_data.append({
+            "date": date_str,
+            "price": round(price, 2),
+            "rsi": round(rsi, 1),
+            "rsi_label": rsi_label,
+            "amount": amount,
+            "quantity": round(qty, 8),
+        })
+
+    # Résumé
+    current_price = closes[-1] if closes else 0
+    market_value = total_qty * current_price
+    pnl = market_value - total_invested
+    pnl_pct = (pnl / total_invested * 100) if total_invested > 0 else 0
+
+    summary = {
+        "total_invested": round(total_invested, 2),
+        "total_quantity": round(total_qty, 8),
+        "current_price": round(current_price, 2),
+        "market_value": round(market_value, 2),
+        "pnl": round(pnl, 2),
+        "pnl_pct": round(pnl_pct, 2),
+        "days_simulated": len(daily_data),
+        "days_bought": sum(1 for d in daily_data if d["amount"] > 0),
+        "avg_buy_price": round(total_invested / total_qty, 2) if total_qty > 0 else 0,
+    }
+
+    return {"daily_data": daily_data, "summary": summary}

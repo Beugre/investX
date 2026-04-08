@@ -97,6 +97,13 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
     except Exception as e:
         logger.warning("Could not fetch market price for %s/%s: %s", uid, symbol, e)
 
+    if market_price <= 0 and total_qty > 0:
+        # Ne pas enregistrer un snapshot avec un prix = 0 (trompeur)
+        last = firestore_service.get_latest_snapshot(uid, symbol)
+        if last and last.get("market_price", 0) > 0:
+            market_price = last["market_price"]
+            logger.info("Using last known price for %s/%s: %.2f", uid, symbol, market_price)
+
     market_value = total_qty * market_price
     pnl_value = market_value - total_invested
     pnl_percent = (pnl_value / total_invested * 100) if total_invested > 0 else 0.0

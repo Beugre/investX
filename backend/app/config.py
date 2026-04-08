@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # ── Telegram ──
     telegram_bot_token: str = Field(..., alias="TELEGRAM_BOT_TOKEN")
+    telegram_webhook_mode: bool = Field(False, alias="TELEGRAM_WEBHOOK_MODE")
 
     # ── Binance ──
     binance_base_url: str = Field(

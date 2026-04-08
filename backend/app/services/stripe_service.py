@@ -80,14 +80,21 @@ def handle_event(event: dict[str, Any]) -> None:
 
 
 def _find_uid_by_customer_id(customer_id: str) -> str | None:
-    """Cherche le uid Firebase associé à un customer_id Stripe."""
-    from google.cloud.firestore_v1 import FieldFilter
-
+    """Cherche le uid Firebase associé à un customer_id Stripe.
+    Utilise d'abord l'index stripe_customers pour un lookup O(1),
+    puis fallback sur le scan complet.
+    """
     db = firestore_service._db()
-    docs = (
-        db.collection("users")
-        .stream()
-    )
+
+    # 1. Lookup rapide via l'index
+    idx_doc = db.collection("stripe_customers").document(customer_id).get()
+    if idx_doc.exists:
+        uid = idx_doc.to_dict().get("uid")
+        if uid:
+            return uid
+
+    # 2. Fallback : scan (legacy, sera de moins en moins utilisé)
+    docs = db.collection("users").stream()
     for doc in docs:
         sub = (
             db.collection("users")
@@ -97,6 +104,10 @@ def _find_uid_by_customer_id(customer_id: str) -> str | None:
             .get()
         )
         if sub.exists and sub.to_dict().get("customer_id") == customer_id:
+            # Écrire l'index pour les prochains appels
+            db.collection("stripe_customers").document(customer_id).set(
+                {"uid": doc.id, "created_at": datetime.now(timezone.utc)}
+            )
             return doc.id
     return None
 

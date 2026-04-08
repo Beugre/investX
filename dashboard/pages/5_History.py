@@ -3,6 +3,7 @@ Page 5 – Historique des ordres et snapshots.
 """
 
 import streamlit as st
+import pandas as pd
 
 from components.auth_guard import require_auth
 from components.tables import display_orders_table, display_snapshots_table
@@ -11,6 +12,8 @@ from services.api_client import (
     get_portfolio_history,
     get_binance_status,
     get_revolutx_status,
+    export_orders_csv,
+    get_dca_v2_cycle_logs,
 )
 
 st.set_page_config(page_title="History – InvestX", page_icon="📜")
@@ -40,12 +43,33 @@ except Exception:
 if len(available_symbols) == 1:
     available_symbols.extend(BINANCE_PAIRS)
 
-tab_orders, tab_snapshots = st.tabs(["📋 Ordres", "📸 Snapshots"])
+tab_orders, tab_snapshots, tab_cycles = st.tabs(["📋 Ordres", "📸 Snapshots", "🔄 Cycles v2"])
 
 with tab_orders:
     st.subheader("Historique des ordres")
-    symbol_filter = st.selectbox("Filtrer par paire", available_symbols, key="order_symbol")
-    limit = st.slider("Nombre d'ordres", 10, 200, 50, key="order_limit")
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        symbol_filter = st.selectbox("Filtrer par paire", available_symbols, key="order_symbol")
+    with col2:
+        limit = st.slider("Nombre d'ordres", 10, 200, 50, key="order_limit")
+    with col3:
+        st.write("")
+        st.write("")
+        if st.button("📥 Export CSV"):
+            try:
+                csv_data = export_orders_csv(
+                    token,
+                    symbol=symbol_filter if symbol_filter else None,
+                    limit=500,
+                )
+                st.download_button(
+                    "💾 Télécharger",
+                    csv_data,
+                    file_name="investx_orders.csv",
+                    mime="text/csv",
+                )
+            except Exception as e:
+                st.error(f"Erreur export : {e}")
 
     try:
         orders = get_orders(
@@ -69,5 +93,44 @@ with tab_snapshots:
             limit=limit2,
         )
         display_snapshots_table(snapshots)
+    except Exception as e:
+        st.error(f"Erreur : {e}")
+
+with tab_cycles:
+    st.subheader("🔄 Historique des cycles DCA v2")
+    cycle_limit = st.slider("Nombre de cycles", 10, 100, 30, key="cycle_limit")
+    try:
+        logs = get_dca_v2_cycle_logs(token, limit=cycle_limit)
+        if logs:
+            df = pd.DataFrame(logs)
+
+            if "started_at" in df.columns:
+                df["started_at"] = pd.to_datetime(df["started_at"], errors="coerce")
+                df = df.sort_values("started_at", ascending=True)
+
+            # Graphique : montant investi par cycle
+            if "total_invested" in df.columns and "started_at" in df.columns:
+                st.markdown("**💰 Montant investi par cycle**")
+                chart_data = df.set_index("started_at")[["total_invested"]].dropna()
+                if not chart_data.empty:
+                    st.bar_chart(chart_data)
+
+            # Graphique : nombre d'ordres par cycle
+            if "orders_count" in df.columns and "started_at" in df.columns:
+                st.markdown("**📊 Nombre d'ordres par cycle**")
+                chart_data2 = df.set_index("started_at")[["orders_count"]].dropna()
+                if not chart_data2.empty:
+                    st.bar_chart(chart_data2)
+
+            # Tableau détaillé
+            st.markdown("**📋 Détails des cycles**")
+            display_cols = [c for c in ["started_at", "status", "mode", "total_invested",
+                                        "orders_count", "duration_s"] if c in df.columns]
+            df_display = df[display_cols].copy()
+            if "started_at" in df_display.columns:
+                df_display["started_at"] = df_display["started_at"].dt.strftime("%d/%m/%Y %H:%M")
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("Aucun cycle v2 enregistré.")
     except Exception as e:
         st.error(f"Erreur : {e}")

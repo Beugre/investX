@@ -150,6 +150,15 @@ def get_dca_v2_crash_reserve(token: str) -> dict:
     return _get("/dca/v2/crash-reserve", token)
 
 
+# ── Take-Profit ──
+def get_take_profit_config(token: str) -> dict:
+    return _get("/dca/v2/take-profit", token)
+
+
+def update_take_profit_config(token: str, data: dict) -> dict:
+    return _put("/dca/v2/take-profit", token, json=data)
+
+
 def get_dca_v2_cycle_logs(token: str, limit: int = 30) -> list:
     return _get("/dca/v2/cycle-logs", token, params={"limit": limit})
 
@@ -171,6 +180,17 @@ def simulate_dca_v2(payload: dict) -> dict:
         f"{API_BASE_URL}/dca/v2/simulate",
         json=payload,
         timeout=15,
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+def backtest_dca_v2(base_daily_amount: float, days: int = 365, symbol: str = "BTCUSDC") -> dict:
+    """Backtesting RSI v2 – endpoint public."""
+    r = requests.get(
+        f"{API_BASE_URL}/dca/v2/backtest",
+        params={"base_daily_amount": base_daily_amount, "days": days, "symbol": symbol},
+        timeout=30,
     )
     r.raise_for_status()
     return r.json()
@@ -253,6 +273,22 @@ def get_orders(token: str, symbol: str | None = None, limit: int = 50) -> list:
     return _get("/orders", token, params=params)
 
 
+def export_orders_csv(token: str, symbol: str | None = None, limit: int = 500) -> str:
+    """Télécharge les ordres au format CSV (retourne le contenu texte)."""
+    params: dict = {"limit": limit}
+    if symbol:
+        params["symbol"] = symbol
+    import requests
+    resp = requests.get(
+        f"{API_BASE}/orders/export",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.text
+
+
 def get_latest_order(token: str, symbol: str = "BTCUSDC") -> dict | None:
     return _get("/orders/latest", token, params={"symbol": symbol})
 
@@ -275,3 +311,33 @@ def test_telegram(token: str) -> dict:
 
 def update_telegram_settings(token: str, settings: dict) -> dict:
     return _put("/telegram/settings", token, json=settings)
+
+
+# ── Alertes de prix ──
+def list_alerts(token: str) -> list:
+    return _get("/alerts", token)
+
+
+def create_alert(token: str, symbol: str, target_price: float, direction: str) -> dict:
+    return _post("/alerts", token, json={
+        "symbol": symbol,
+        "target_price": target_price,
+        "direction": direction,
+    })
+
+
+def delete_alert(token: str, alert_id: str) -> dict:
+    return _delete(f"/alerts/{alert_id}", token)
+
+
+# ── Admin ──
+def admin_overview(token: str) -> dict:
+    return _get("/admin/overview", token)
+
+
+def admin_list_users(token: str) -> list:
+    return _get("/admin/users", token)
+
+
+def admin_recent_orders(token: str, limit: int = 50) -> list:
+    return _get("/admin/recent-orders", token, params={"limit": limit})
