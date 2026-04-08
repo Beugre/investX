@@ -736,14 +736,18 @@ with st.expander("💰 Take-Profit (sortie automatique)"):
 
 # ── Backtesting ──
 with st.expander("📊 Backtesting (simulation historique)"):
-    st.caption("Simulez la stratégie RSI v2 sur les données historiques réelles.")
+    st.caption(
+        "Comparez la stratégie RSI v2 (achat intelligent) au DCA classique (montant fixe). "
+        "La stratégie RSI achète plus quand le marché est bas et moins quand il est haut."
+    )
     col_bt1, col_bt2, col_bt3 = st.columns(3)
     with col_bt1:
         bt_amount = st.number_input(
             "Montant journalier (€/$)", min_value=1.0, value=12.0, step=1.0, key="bt_amt"
         )
     with col_bt2:
-        bt_days = st.selectbox("Période", [90, 180, 365, 730], index=2, key="bt_days")
+        bt_days = st.selectbox("Période", [90, 180, 365, 730, 1095], index=2, key="bt_days",
+                               format_func=lambda x: {90: "3 mois", 180: "6 mois", 365: "1 an", 730: "2 ans", 1095: "3 ans"}[x])
     with col_bt3:
         bt_sym = st.selectbox(
             "Paire", ["BTCUSDC", "ETHUSDC", "SOLUSDC", "BNBUSDC"], key="bt_sym"
@@ -758,13 +762,47 @@ with st.expander("📊 Backtesting (simulation historique)"):
                 if result.get("error"):
                     st.error(result["error"])
                 else:
+                    # ── Résultat RSI v2 vs DCA simple ──
+                    st.markdown("#### 🧠 Stratégie RSI v2")
                     c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("Total investi", f"{summary.get('total_invested', 0):,.2f}")
+                    c1.metric("Investi", f"{summary.get('total_invested', 0):,.2f}")
                     c2.metric("Valeur actuelle", f"{summary.get('market_value', 0):,.2f}")
                     pnl = summary.get("pnl", 0)
                     pnl_pct = summary.get("pnl_pct", 0)
                     c3.metric("PnL", f"{pnl:+,.2f}", delta=f"{pnl_pct:+.1f}%")
-                    c4.metric("Prix moyen achat", f"{summary.get('avg_buy_price', 0):,.2f}")
+                    c4.metric("Prix moyen", f"{summary.get('avg_buy_price', 0):,.2f}")
+
+                    st.markdown("#### 📉 DCA Simple (comparaison)")
+                    c5, c6, c7, c8 = st.columns(4)
+                    c5.metric("Investi", f"{summary.get('simple_invested', 0):,.2f}")
+                    c6.metric("Valeur actuelle", f"{summary.get('simple_value', 0):,.2f}")
+                    simple_pnl = summary.get("simple_pnl", 0)
+                    simple_pnl_pct = summary.get("simple_pnl_pct", 0)
+                    c7.metric("PnL", f"{simple_pnl:+,.2f}", delta=f"{simple_pnl_pct:+.1f}%")
+                    c8.metric("Prix moyen", f"{summary.get('simple_avg_price', 0):,.2f}")
+
+                    # ── Avantage RSI ──
+                    advantage = summary.get("advantage_pct", 0)
+                    if advantage > 0:
+                        st.success(
+                            f"✅ **La stratégie RSI v2 surperforme le DCA simple de +{advantage:.1f}%** — "
+                            f"prix moyen d'achat plus bas ({summary.get('avg_buy_price', 0):,.0f} vs "
+                            f"{summary.get('simple_avg_price', 0):,.0f})"
+                        )
+                    elif advantage < 0:
+                        st.info(
+                            f"ℹ️ Sur cette période, le DCA simple fait {abs(advantage):.1f}% de mieux. "
+                            "Cela peut arriver dans les marchés en hausse continue."
+                        )
+                    else:
+                        st.info("Performances identiques sur cette période.")
+
+                    if pnl < 0:
+                        st.caption(
+                            "⚠️ Le PnL négatif reflète les conditions de marché actuelles, pas la qualité "
+                            "de la stratégie. Le DCA est une stratégie long terme — essayez une période plus "
+                            "longue (2-3 ans) pour voir l'effet sur un cycle complet."
+                        )
 
                     st.write(
                         f"📅 {summary.get('days_simulated', 0)} jours simulés, "

@@ -1332,6 +1332,21 @@ def backtest_rsi_v2(
     pnl = market_value - total_invested
     pnl_pct = (pnl / total_invested * 100) if total_invested > 0 else 0
 
+    # Comparaison DCA simple (montant fixe chaque jour)
+    simple_invested = 0.0
+    simple_qty = 0.0
+    for i in range(len(closes)):
+        if rsi_series[i] is None:
+            continue  # même fenêtre que le RSI v2
+        price = closes[i]
+        if price > 0:
+            simple_invested += base_daily_amount
+            simple_qty += base_daily_amount / price
+    simple_value = simple_qty * current_price
+    simple_pnl = simple_value - simple_invested
+    simple_pnl_pct = (simple_pnl / simple_invested * 100) if simple_invested > 0 else 0
+    advantage = pnl_pct - simple_pnl_pct
+
     summary = {
         "total_invested": round(total_invested, 2),
         "total_quantity": round(total_qty, 8),
@@ -1342,6 +1357,13 @@ def backtest_rsi_v2(
         "days_simulated": len(daily_data),
         "days_bought": sum(1 for d in daily_data if d["amount"] > 0),
         "avg_buy_price": round(total_invested / total_qty, 2) if total_qty > 0 else 0,
+        # Comparaison DCA simple
+        "simple_invested": round(simple_invested, 2),
+        "simple_value": round(simple_value, 2),
+        "simple_pnl": round(simple_pnl, 2),
+        "simple_pnl_pct": round(simple_pnl_pct, 2),
+        "simple_avg_price": round(simple_invested / simple_qty, 2) if simple_qty > 0 else 0,
+        "advantage_pct": round(advantage, 2),
     }
 
     return {"daily_data": daily_data, "summary": summary}
