@@ -237,6 +237,11 @@ def execute_user_dca(uid: str) -> dict | None:
     creds = ctx["creds"]
     exchange = ctx["exchange"]
 
+    # 6b. Reset force_rebuy AVANT l'ordre (évite boucle infinie si l'ordre échoue)
+    if force_rebuy:
+        firestore_service.update_dca_config(uid, {"force_rebuy": False})
+        logger.info("force_rebuy reset to False for user %s (before order)", uid)
+
     # 7. Passer l'ordre
     try:
         order_data = _place_exchange_order(exchange, creds, symbol, daily_amount)
@@ -284,11 +289,6 @@ def execute_user_dca(uid: str) -> dict | None:
 
     # 9. Audit
     audit_service.log_dca_executed(uid, symbol, daily_amount)
-
-    # 9b. Reset force_rebuy si activé
-    if force_rebuy:
-        firestore_service.update_dca_config(uid, {"force_rebuy": False})
-        logger.info("force_rebuy reset to False for user %s", uid)
 
     # 10. Refresh snapshot
     try:
@@ -614,8 +614,9 @@ def _execute_user_dca_v2(uid: str, config: dict, *, force_now: bool = False) -> 
             return {"_no_orders": True, "errors": order_errors}
         return None
 
-    # ── 11. Enregistrement spending ──────────────────
-    actual_spent = sum(p["amount"] for p in pair_orders)  # Crash reserve hors caps
+    # ── 11. Enregistrement spending (seulement les ordres réellement exécutés) ──
+    executed_symbols = {o.get("symbol") for o in orders_executed if o.get("source") == ORDER_SOURCE_SCHEDULER}
+    actual_spent = sum(p["amount"] for p in pair_orders if p["symbol"] in executed_symbols)
     if actual_spent > 0:
         firestore_service.increment_spending(uid, _today_key(), actual_spent)
         firestore_service.increment_spending(uid, _week_key(), actual_spent)
@@ -1219,6 +1220,31 @@ def run_cycle() -> int:
 # Backtesting RSI v2
 # ══════════════════════════════════════════════════════
 
+import time as _time
+
+_klines_cache: dict[str, tuple[float, list]] = {}
+_KLINES_CACHE_TTL = 86400  # 24 h
+
+
+def _fetch_klines_cached(binance_symbol: str, days: int) -> list | None:
+    """Fetch Binance klines with a 24h in-memory cache."""
+    import httpx
+    cache_key = f"{binance_symbol}:{days}"
+    cached = _klines_cache.get(cache_key)
+    if cached and (_time.time() - cached[0]) < _KLINES_CACHE_TTL:
+        return cached[1]
+    url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit={days}"
+    try:
+        resp = httpx.get(url, timeout=15)
+        resp.raise_for_status()
+        klines = resp.json()
+    except Exception as e:
+        logger.error("Backtest: failed to fetch klines: %s", e)
+        return None
+    _klines_cache[cache_key] = (_time.time(), klines)
+    return klines
+
+
 def backtest_rsi_v2(
     base_daily_amount: float,
     days: int = 365,
@@ -1230,18 +1256,12 @@ def backtest_rsi_v2(
       - daily_data : list[dict] avec date, prix, RSI, montant investi, qty achetée
       - summary : totaux, PnL
     """
-    import httpx
 
-    # Récupérer les klines historiques
+    # Récupérer les klines historiques (cache 24h)
     binance_symbol = symbol.replace("-", "")
-    url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit={days}"
-    try:
-        resp = httpx.get(url, timeout=15)
-        resp.raise_for_status()
-        klines = resp.json()
-    except Exception as e:
-        logger.error("Backtest: failed to fetch klines: %s", e)
-        return {"error": str(e), "daily_data": [], "summary": {}}
+    klines = _fetch_klines_cached(binance_symbol, days)
+    if klines is None:
+        return {"error": "Impossible de récupérer les données historiques", "daily_data": [], "summary": {}}
 
     if len(klines) < 15:
         return {"error": "Pas assez de données", "daily_data": [], "summary": {}}

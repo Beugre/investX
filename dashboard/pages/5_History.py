@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from components.auth_guard import require_auth
+from components.constants import BINANCE_ALL_PAIRS, REVOLUTX_ALL_PAIRS
 from components.tables import display_orders_table, display_snapshots_table
 from services.api_client import (
     get_orders,
@@ -24,8 +25,8 @@ if not token:
     st.stop()
 
 # ── Paires dynamiques selon les exchanges connectés ──
-BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
-REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR"]
+BINANCE_PAIRS = BINANCE_ALL_PAIRS
+REVOLUTX_PAIRS = REVOLUTX_ALL_PAIRS
 
 available_symbols: list[str] = [""]
 try:

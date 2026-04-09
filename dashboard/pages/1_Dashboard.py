@@ -16,6 +16,7 @@ from streamlit_autorefresh import st_autorefresh
 
 from components.auth_guard import require_auth
 from components.metrics import display_kpi_row, display_price_info
+from components.constants import BINANCE_ALL_PAIRS, REVOLUTX_ALL_PAIRS
 from services.api_client import (
     get_portfolio_summary,
     get_portfolio_history,
@@ -131,8 +132,8 @@ st.divider()
 # ══════════════════════════════════════════════════════
 # Détection des exchanges connectés
 # ══════════════════════════════════════════════════════
-BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
-REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR"]
+BINANCE_PAIRS = BINANCE_ALL_PAIRS
+REVOLUTX_PAIRS = REVOLUTX_ALL_PAIRS
 
 binance_connected = False
 revolutx_connected = False
@@ -185,14 +186,15 @@ def render_exchange_portfolio(
     # ── Chargement des données ──
     history: list[dict] = []
     orders: list[dict] = []
-    try:
-        history = get_portfolio_history(token, symbol=symbol, limit=period_limit)
-    except Exception:
-        pass
-    try:
-        orders = get_orders(token, symbol=symbol, limit=500)
-    except Exception:
-        pass
+    with st.spinner("Chargement du portfolio..."):
+        try:
+            history = get_portfolio_history(token, symbol=symbol, limit=period_limit)
+        except Exception:
+            pass
+        try:
+            orders = get_orders(token, symbol=symbol, limit=500)
+        except Exception:
+            pass
 
     # ── KPIs (snapshot le plus récent) ──
     st.subheader("📈 Portfolio")

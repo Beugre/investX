@@ -15,7 +15,8 @@ logger = get_logger(__name__)
 
 
 def cleanup_old_records_job() -> None:
-    """Supprime les dca_locks > 7 jours et stripe_events > 30 jours."""
+    """Supprime les dca_locks > 7 jours, stripe_events > 30 jours,
+    et prune les snapshots portfolio (max 100 par utilisateur)."""
     try:
         db = fb_firestore.client()
         deleted = 0
@@ -43,6 +44,28 @@ def cleanup_old_records_job() -> None:
         for doc in old_events:
             doc.reference.delete()
             deleted += 1
+
+        # Prune portfolio snapshots (max 100 par utilisateur)
+        try:
+            users = db.collection("users").stream()
+            for user_doc in users:
+                uid = user_doc.id
+                coll = db.collection("users").document(uid).collection("portfolio_snapshots")
+                old_snaps = list(
+                    coll.order_by("captured_at", direction=fb_firestore.Query.DESCENDING)
+                    .offset(100)
+                    .limit(500)
+                    .stream()
+                )
+                if old_snaps:
+                    batch = db.batch()
+                    for doc in old_snaps:
+                        batch.delete(doc.reference)
+                    batch.commit()
+                    deleted += len(old_snaps)
+                    logger.info("Pruned %d old snapshots for user %s", len(old_snaps), uid)
+        except Exception as e:
+            logger.error("Snapshot pruning failed: %s", e)
 
         if deleted:
             logger.info("Cleanup: %d old records deleted", deleted)

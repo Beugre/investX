@@ -12,6 +12,7 @@ import streamlit as st
 import pandas as pd
 
 from components.auth_guard import require_auth
+from components.constants import BINANCE_PAIRS as _BN_PAIRS, BINANCE_ALL_PAIRS, REVOLUTX_PAIRS as _RX_PAIRS, REVOLUTX_ALL_PAIRS
 from services.api_client import (
     get_dca_config,
     update_dca_config,
@@ -39,15 +40,12 @@ if not token:
     st.stop()
 
 # ── Exchange actif & paires correspondantes ──
-BINANCE_PAIRS = ["BTCUSDC", "ETHUSDC", "SOLUSDC"]
-REVOLUTX_PAIRS = ["BTC-EUR", "ETH-EUR", "SOL-EUR", "BTC-USDC", "ETH-USDC", "SOL-USDC"]
+BINANCE_PAIRS = _BN_PAIRS
+REVOLUTX_PAIRS = _RX_PAIRS
 
 # Paires pour le DCA v1 (toutes les paires)
-BINANCE_V1_PAIRS = ["BTCUSDC", "ETHUSDC", "BNBUSDC", "ADAUSDC", "SOLUSDC"]
-REVOLUTX_V1_PAIRS = [
-    "BTC-EUR", "ETH-EUR", "BNB-EUR", "ADA-EUR", "SOL-EUR",
-    "BTC-USDC", "ETH-USDC", "SOL-USDC",
-]
+BINANCE_V1_PAIRS = BINANCE_ALL_PAIRS
+REVOLUTX_V1_PAIRS = REVOLUTX_ALL_PAIRS
 
 try:
     active_exchange = get_active_exchange(token)
@@ -701,10 +699,24 @@ with st.expander("💰 Take-Profit (sortie automatique)"):
     if existing_rules:
         st.markdown("**Règles actives :**")
         for i, rule in enumerate(existing_rules):
-            st.write(
-                f"• **{rule.get('symbol')}** → Vente de {rule.get('sell_pct', 50):.0f}% "
-                f"si prix ≥ {currency_symbol}{rule.get('target_price', 0):,.2f}"
-            )
+            col_rule, col_del = st.columns([5, 1])
+            with col_rule:
+                st.write(
+                    f"• **{rule.get('symbol')}** → Vente de {rule.get('sell_pct', 50):.0f}% "
+                    f"si prix ≥ {currency_symbol}{rule.get('target_price', 0):,.2f}"
+                )
+            with col_del:
+                if st.button("🗑️", key=f"tp_del_{i}"):
+                    updated_rules = [r for j, r in enumerate(existing_rules) if j != i]
+                    try:
+                        update_take_profit_config(token, {
+                            "enabled": tp_enabled,
+                            "rules": updated_rules,
+                        })
+                        st.success("✅ Règle supprimée !")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur : {e}")
 
     # Formulaire pour ajouter une règle
     with st.form("tp_form"):
@@ -820,5 +832,14 @@ with st.expander("📊 Backtesting (simulation historique)"):
                             st.bar_chart(df_bt.set_index("date")[["amount"]])
                         with tab2:
                             st.line_chart(df_bt.set_index("date")[["rsi"]])
+
+                        # Export CSV
+                        csv_data = df_bt.to_csv(index=False)
+                        st.download_button(
+                            "📥 Télécharger le backtest (CSV)",
+                            csv_data,
+                            file_name=f"backtest_{bt_sym}_{bt_days}j.csv",
+                            mime="text/csv",
+                        )
             except Exception as e:
                 st.error(f"Erreur backtesting : {e}")

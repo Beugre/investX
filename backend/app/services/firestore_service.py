@@ -292,9 +292,6 @@ def save_snapshot(uid: str, data: dict[str, Any]) -> str:
     data["captured_at"] = datetime.now(timezone.utc)
     ref.set(data)
 
-    # Garder uniquement les 100 derniers snapshots
-    _prune_old_snapshots(uid, max_keep=100)
-
     return ref.id
 
 

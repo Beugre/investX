@@ -26,6 +26,26 @@ from services.api_client import (
 )
 from services.session_manager import try_restore_session, save_session, clear_session
 
+
+def _friendly_error(e: Exception) -> str:
+    """Convertit une exception Firebase/API en message utilisateur."""
+    msg = str(e).lower()
+    if "invalid_login_credentials" in msg or "invalid password" in msg:
+        return "Email ou mot de passe incorrect."
+    if "email_not_found" in msg:
+        return "Aucun compte trouvé avec cet email."
+    if "email_exists" in msg:
+        return "Un compte existe déjà avec cet email."
+    if "too_many_attempts" in msg or "too many" in msg:
+        return "Trop de tentatives. Réessayez dans quelques minutes."
+    if "weak_password" in msg:
+        return "Le mot de passe est trop faible (min. 6 caractères)."
+    if "invalid_email" in msg:
+        return "L'adresse email n'est pas valide."
+    if "network" in msg or "connection" in msg:
+        return "Erreur réseau. Vérifiez votre connexion internet."
+    return "Une erreur est survenue. Réessayez plus tard."
+
 st.set_page_config(
     page_title="Accueil – InvestX",
     page_icon="📈",
@@ -124,7 +144,7 @@ def _landing_page():
                     st.success("✅ Connecté !")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"❌ Erreur : {e}")
+                    st.error(f"❌ {_friendly_error(e)}")
 
         # ── Mot de passe oublié ──
         with st.expander("🔑 Mot de passe oublié ?"):
@@ -137,7 +157,7 @@ def _landing_page():
                         send_password_reset_email(reset_email)
                         st.success("📧 Un email de réinitialisation a été envoyé ! Vérifiez votre boîte de réception.")
                     except Exception as e:
-                        st.error(f"❌ Erreur : {e}")
+                        st.error(f"❌ {_friendly_error(e)}")
 
     with tab_signup:
         with st.form("signup_form"):
@@ -192,7 +212,7 @@ def _landing_page():
                         st.success("✅ Compte créé ! Un email de vérification a été envoyé.")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Erreur : {e}")
+                        st.error(f"❌ {_friendly_error(e)}")
 
 
 # ══════════════════════════════════════════════════════

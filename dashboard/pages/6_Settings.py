@@ -5,6 +5,7 @@ Page 6 – Paramètres généraux.
 import streamlit as st
 
 from components.auth_guard import require_auth, get_email, get_uid
+from components.constants import ALERT_SYMBOLS, COMMON_TIMEZONES
 from services.api_client import get_user_profile, update_user_profile, list_alerts, create_alert, delete_alert
 
 st.set_page_config(page_title="Settings – InvestX", page_icon="🛠")
@@ -48,19 +49,21 @@ st.write(f"**UID :** {get_uid()}")
 st.divider()
 
 st.subheader("Timezone")
-st.info("Timezone par défaut : **Europe/Paris**")
-st.caption("La modification de timezone sera disponible dans une prochaine version.")
+current_tz = current_profile.get("timezone", "Europe/Paris")
+selected_tz = st.selectbox("Timezone", COMMON_TIMEZONES, index=COMMON_TIMEZONES.index(current_tz) if current_tz in COMMON_TIMEZONES else 0)
+if selected_tz != current_tz:
+    if st.button("💾 Enregistrer la timezone"):
+        try:
+            update_user_profile(token, {"timezone": selected_tz})
+            st.success(f"✅ Timezone mise à jour : {selected_tz}")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Erreur : {e}")
 
 st.divider()
 
 st.subheader("🔔 Alertes de prix")
 st.caption("Recevez une notification Telegram quand un prix est atteint.")
-
-ALERT_SYMBOLS = [
-    "BTCUSDC", "ETHUSDC", "SOLUSDC", "BNBUSDC", "ADAUSDC",
-    "BTC-EUR", "ETH-EUR", "SOL-EUR", "BNB-EUR", "ADA-EUR",
-    "BTC-USDC", "ETH-USDC", "SOL-USDC",
-]
 
 with st.form("alert_form"):
     col_s, col_p, col_d = st.columns([2, 2, 1])

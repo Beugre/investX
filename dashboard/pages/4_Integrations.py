@@ -59,12 +59,24 @@ if is_connected:
 
     with col2:
         if st.button("🔌 Déconnecter Binance"):
-            try:
-                disconnect_binance(token)
-                st.success("Binance déconnecté")
+            st.session_state["confirm_disconnect_binance"] = True
+
+    if st.session_state.get("confirm_disconnect_binance"):
+        st.warning("⚠️ Êtes-vous sûr de vouloir déconnecter Binance ? Vos clés API seront supprimées.")
+        c1, c2, _ = st.columns([1, 1, 3])
+        with c1:
+            if st.button("✅ Confirmer", key="confirm_disconnect_bn"):
+                try:
+                    disconnect_binance(token)
+                    st.session_state.pop("confirm_disconnect_binance", None)
+                    st.success("Binance déconnecté")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
+        with c2:
+            if st.button("❌ Annuler", key="cancel_disconnect_bn"):
+                st.session_state.pop("confirm_disconnect_binance", None)
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erreur : {e}")
 else:
     st.warning("Binance non connecté.")
     st.markdown("""
@@ -121,12 +133,24 @@ if rx_connected:
 
     with col2:
         if st.button("🔌 Déconnecter Revolut X", key="rx_disconnect"):
-            try:
-                disconnect_revolutx(token)
-                st.success("Revolut X déconnecté")
+            st.session_state["confirm_disconnect_rx"] = True
+
+    if st.session_state.get("confirm_disconnect_rx"):
+        st.warning("⚠️ Êtes-vous sûr de vouloir déconnecter Revolut X ? Vos clés seront supprimées.")
+        c1, c2, _ = st.columns([1, 1, 3])
+        with c1:
+            if st.button("✅ Confirmer", key="confirm_disconnect_rx"):
+                try:
+                    disconnect_revolutx(token)
+                    st.session_state.pop("confirm_disconnect_rx", None)
+                    st.success("Revolut X déconnecté")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
+        with c2:
+            if st.button("❌ Annuler", key="cancel_disconnect_rx"):
+                st.session_state.pop("confirm_disconnect_rx", None)
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erreur : {e}")
 else:
     st.warning("Revolut X non connecté.")
 
