@@ -7,8 +7,15 @@ from __future__ import annotations
 from app.logger import get_logger
 from app.services import firestore_service, telegram_service
 from app.services.binance_service import get_symbol_price_no_auth
+from app.services.revolutx_service import get_symbol_price_no_auth as get_revolutx_price_no_auth
 
 logger = get_logger(__name__)
+
+
+def _get_public_price(symbol: str) -> float:
+    if "-" in symbol:
+        return get_revolutx_price_no_auth(symbol)
+    return get_symbol_price_no_auth(symbol)
 
 
 def check_price_alerts_job() -> None:
@@ -23,7 +30,7 @@ def check_price_alerts_job() -> None:
         prices: dict[str, float] = {}
         for sym in symbols:
             try:
-                price = get_symbol_price_no_auth(sym)
+                price = _get_public_price(sym)
                 if price and price > 0:
                     prices[sym] = price
             except Exception as e:
@@ -51,14 +58,14 @@ def check_price_alerts_job() -> None:
                 # Notification Telegram
                 arrow = "📈" if direction == "above" else "📉"
                 msg = (
-                    f"{arrow} *Alerte de prix déclenchée*\n\n"
-                    f"Paire : `{sym}`\n"
-                    f"Prix actuel : `{current_price:,.2f}`\n"
-                    f"Cible : `{target:,.2f}` ({direction})"
+                    f"{arrow} <b>Alerte de prix déclenchée</b>\n\n"
+                    f"Paire : <code>{sym}</code>\n"
+                    f"Prix actuel : <code>{current_price:,.2f}</code>\n"
+                    f"Cible : <code>{target:,.2f}</code> ({direction})"
                 )
                 try:
                     tg = firestore_service.get_telegram_settings(uid)
-                    if tg and tg.get("chat_id") and tg.get("notify_on_execution", True):
+                    if tg and tg.get("chat_id") and tg.get("enabled", True) and tg.get("notify_orders", True):
                         telegram_service.send_message_sync(tg["chat_id"], msg)
                 except Exception as e:
                     logger.warning("Alert notification failed for %s: %s", uid, e)

@@ -25,7 +25,7 @@ users/{uid}
 │
 ├── dca_config/main
 │   ├── enabled: bool
-│   ├── symbol: string (BTCEUR|ETHEUR|BNBEUR|ADAEUR|SOLEUR)
+│   ├── symbol: string (BTCUSDC|ETHUSDC|BNBUSDC|ADAUSDC|SOLUSDC|BTC-EUR|ETH-EUR|...)
 │   ├── daily_amount_eur: float
 │   ├── execution_hour: int (0-23)
 │   ├── execution_minute: int (0-59)
@@ -36,7 +36,7 @@ users/{uid}
 │
 ├── binance_account/main
 │   ├── exchange: "binance"
-│   ├── secret_ref: string (chemin Secret Manager)
+│   ├── secret_ref: string (référence du secret chiffré)
 │   ├── label: string
 │   ├── is_connected: bool
 │   ├── permissions_validated: bool
@@ -56,14 +56,14 @@ users/{uid}
 │
 ├── orders/{order_id}
 │   ├── symbol: string
-│   ├── side: "BUY"
+│   ├── side: "BUY"|"SELL"
 │   ├── amount_eur: float
 │   ├── quantity: float
 │   ├── price: float
-│   ├── status: string (FILLED|FAILED)
+│   ├── status: string (FILLED|DONE|COMPLETED|FAILED)
 │   ├── exchange_order_id: string
 │   ├── executed_at: timestamp
-│   ├── source: string (scheduler|manual)
+│   ├── source: string (scheduler|manual|take_profit|crash_reserve)
 │   ├── error_message: string|null
 │   └── created_at: timestamp
 │

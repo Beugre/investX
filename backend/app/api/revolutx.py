@@ -28,13 +28,13 @@ async def connect_revolutx(
     payload: RevolutXConnectRequest,
     uid: str = Depends(get_current_uid),
 ):
-    """Connecte un compte Revolut X : valide les credentials, stocke dans Secret Manager."""
+    """Connecte un compte Revolut X : valide les credentials et les stocke chiffrés."""
     # 1. Valider les credentials
     valid = revolutx_service.validate_credentials(payload.api_key, payload.private_key_pem)
     if not valid:
         raise BadRequest("Invalid Revolut X credentials")
 
-    # 2. Stocker dans Secret Manager
+    # 2. Stocker les credentials chiffrés
     secret_ref = secret_manager_service.create_or_update_revolutx_secret(
         uid, payload.api_key, payload.private_key_pem
     )

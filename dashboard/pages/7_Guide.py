@@ -286,17 +286,19 @@ with st.expander("8️⃣  Configurer les notifications Telegram (optionnel)", e
         """
 **Objectif** : recevoir une notification Telegram à chaque achat du bot.
 
-1. Ouvrez Telegram et recherchez le bot **@InvestX_The_Bot**.
-2. Cliquez sur **Démarrer** (ou envoyez `/start`).
-3. Envoyez la commande `/id` – le bot vous répond avec votre **Chat ID** (un nombre).
-4. Copiez ce Chat ID.
-5. Sur InvestX, allez dans **🔗 Intégrations** → section **Telegram**.
-6. Collez votre **Chat ID** et cliquez sur **Enregistrer**.
-7. Cliquez sur **Envoyer un message test** pour vérifier ✅
+1. Sur InvestX, allez dans **🔗 Intégrations** → section **Telegram**.
+2. Cliquez sur le bouton pour **ouvrir le bot Telegram InvestX**.
+3. Telegram lance automatiquement le bot avec votre **code sécurisé de liaison**.
+4. Le bot confirme que votre compte est bien connecté à InvestX ✅
+5. Revenez sur InvestX puis cliquez sur **J'ai envoyé le code au bot**.
+6. Activez les notifications que vous souhaitez recevoir.
+7. Cliquez sur **Tester la notification** pour vérifier que tout fonctionne ✅
 
 > 💡 Les notifications incluent : paire achetée, montant, prix, PnL actuel.
 >
-> Vous pouvez désactiver les notifications à tout moment en vidant le Chat ID.
+> 💡 Ce nouveau système évite les erreurs de saisie et relie automatiquement le bon compte Telegram au bon compte InvestX.
+>
+> Vous pouvez désactiver les notifications à tout moment depuis la section Telegram.
 """
     )
 

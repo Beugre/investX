@@ -33,7 +33,7 @@ InvestX est un SaaS MVP de DCA crypto multi-utilisateur.
 | Dashboard | Streamlit | 8501 | Interface utilisateur |
 | Auth | Firebase Auth | – | Authentification |
 | DB | Firestore | – | Données applicatives |
-| Secrets | Secret Manager | – | Credentials Binance |
+| Secrets | Firestore chiffré | – | Credentials exchange |
 | Paiement | Stripe | – | Abonnements |
 | Trading | Binance API | – | Achats DCA |
 | Notifications | Telegram Bot | – | Alertes |
@@ -51,11 +51,11 @@ InvestX est un SaaS MVP de DCA crypto multi-utilisateur.
 ### Connexion Binance
 1. Utilisateur saisit API key/secret
 2. Backend valide credentials + vérifie pas de retrait
-3. Stockage dans Secret Manager (jamais en clair dans Firestore)
+3. Stockage chiffré des credentials exchange
 
 ### DCA quotidien
 1. Scheduler vérifie toutes les minutes
 2. Pour chaque utilisateur : check abonnement, config, heure, verrou
-3. Récupère credentials depuis Secret Manager
+3. Récupère les credentials depuis le stockage chiffré
 4. Passe l'ordre market buy via Binance API
 5. Sauvegarde ordre + snapshot + notification Telegram

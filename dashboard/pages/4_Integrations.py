@@ -18,7 +18,7 @@ from services.api_client import (
     get_active_exchange,
     set_active_exchange,
     get_telegram_settings,
-    link_telegram,
+    create_telegram_link_request,
     test_telegram,
     update_telegram_settings,
 )
@@ -300,7 +300,16 @@ except Exception as e:
 tg_linked = bool(tg.get("chat_id"))
 
 if tg_linked:
-    st.success(f"✅ Telegram lié (chat_id: {tg.get('chat_id')})")
+    linked_username = tg.get("username")
+    if linked_username:
+        st.success(f"✅ Telegram lié avec le compte @{linked_username}")
+    else:
+        st.success("✅ Telegram lié avec succès")
+
+    st.caption(
+        "Votre compte Telegram est déjà connecté. "
+        "Vous recevrez ici les notifications InvestX selon les préférences ci-dessous."
+    )
 
     # Paramètres de notification
     with st.form("telegram_settings_form"):
@@ -334,26 +343,31 @@ if tg_linked:
 
 else:
     st.warning("Telegram non lié.")
+    try:
+        link_request = create_telegram_link_request(token)
+    except Exception as e:
+        st.error(f"Erreur de génération du code Telegram : {e}")
+        link_request = {}
+
+    code = link_request.get("link_code")
+    bot_url = link_request.get("bot_url", "https://t.me/InvestX_The_Bot")
+
     st.markdown("""
-    **Instructions :**
-    1. Ouvrez le bot **[@InvestX_The_Bot](https://t.me/InvestX_The_Bot)** sur Telegram
-    2. Cliquez sur **Démarrer** ou envoyez `/start`
-    3. Le bot vous enverra votre **Chat ID** — copiez-le
-    4. Collez-le ci-dessous
+    **Connectez Telegram en 30 secondes :**
+    1. Ouvrez le bot InvestX avec le bouton ci-dessous
+    2. Telegram enverra automatiquement votre code sécurisé
+    3. Le bot confirmera la liaison
+    4. Revenez ici puis cliquez sur **J'ai envoyé le code au bot**
     """)
 
-    with st.form("telegram_link_form"):
-        chat_id = st.text_input("Chat ID Telegram")
-        username = st.text_input("Nom d'utilisateur Telegram (optionnel)")
-        submitted = st.form_submit_button("🔗 Lier Telegram")
+    st.info(
+        "💡 Plus besoin de copier-coller un Chat ID. "
+        "Le code de liaison relie automatiquement le bon compte Telegram au bon compte InvestX."
+    )
 
-        if submitted:
-            if not chat_id:
-                st.error("Veuillez entrer votre chat_id.")
-            else:
-                try:
-                    link_telegram(token, chat_id, username or None)
-                    st.success("✅ Telegram lié !")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur : {e}")
+    if code:
+        st.caption("Code temporaire de liaison")
+        st.code(code, language="text")
+        st.link_button("Ouvrir Telegram et lancer la liaison", bot_url)
+        if st.button("J'ai envoyé le code au bot"):
+            st.rerun()

@@ -66,26 +66,50 @@ def handle_event(event: dict[str, Any]) -> None:
     # Idempotency: skip si déjà traité
     db = firestore_service._db()
     event_ref = db.collection("stripe_events").document(event_id)
-    if event_ref.get().exists:
-        logger.info("Stripe event %s already processed, skipping", event_id)
+    try:
+        event_ref.create(
+            {
+                "type": event_type,
+                "status": "processing",
+                "received_at": datetime.now(timezone.utc),
+            }
+        )
+    except Exception:
+        existing = event_ref.get()
+        if existing.exists and existing.to_dict().get("status") == "processed":
+            logger.info("Stripe event %s already processed, skipping", event_id)
+            return
+        logger.info("Stripe event %s is already being processed", event_id)
         return
-    event_ref.set({"type": event_type, "processed_at": datetime.now(timezone.utc)})
 
-    if event_type == "checkout.session.completed":
-        _handle_checkout_completed(data_object)
-    elif event_type in (
-        "customer.subscription.created",
-        "customer.subscription.updated",
-    ):
-        _handle_subscription_updated(data_object, event["id"])
-    elif event_type == "customer.subscription.deleted":
-        _handle_subscription_deleted(data_object, event["id"])
-    elif event_type == "invoice.paid":
-        _handle_invoice_paid(data_object)
-    elif event_type == "invoice.payment_failed":
-        _handle_invoice_payment_failed(data_object)
-    else:
-        logger.info("Unhandled Stripe event type: %s", event_type)
+    try:
+        if event_type == "checkout.session.completed":
+            _handle_checkout_completed(data_object)
+        elif event_type in (
+            "customer.subscription.created",
+            "customer.subscription.updated",
+        ):
+            _handle_subscription_updated(data_object, event["id"])
+        elif event_type == "customer.subscription.deleted":
+            _handle_subscription_deleted(data_object, event["id"])
+        elif event_type == "invoice.paid":
+            _handle_invoice_paid(data_object)
+        elif event_type == "invoice.payment_failed":
+            _handle_invoice_payment_failed(data_object)
+        else:
+            logger.info("Unhandled Stripe event type: %s", event_type)
+
+        event_ref.set(
+            {
+                "type": event_type,
+                "status": "processed",
+                "processed_at": datetime.now(timezone.utc),
+            },
+            merge=True,
+        )
+    except Exception:
+        event_ref.delete()
+        raise
 
 
 def _find_uid_by_customer_id(customer_id: str) -> str | None:

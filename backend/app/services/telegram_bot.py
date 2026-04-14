@@ -33,14 +33,41 @@ async def _handle_message(message: dict) -> None:
         return
 
     if text.strip().startswith("/start"):
+        parts = text.strip().split(maxsplit=1)
+        link_code = parts[1].strip().upper() if len(parts) > 1 else ""
+
+        if link_code:
+            from app.services import audit_service, firestore_service
+
+            uid = firestore_service.consume_telegram_link_request(
+                link_code,
+                chat_id=str(chat_id),
+                username=username or None,
+            )
+            if uid:
+                audit_service.log_telegram_linked(uid, str(chat_id))
+                reply = (
+                    f"✅ <b>Telegram lié avec succès</b>\n\n"
+                    f"Bonjour {first_name}, ce chat recevra désormais vos notifications InvestX."
+                )
+                await _send_reply(chat_id, reply)
+                logger.info("Linked Telegram chat %s to user %s", chat_id, uid)
+                return
+
+            reply = (
+                "⚠️ <b>Code invalide ou expiré</b>\n\n"
+                "Retournez dans InvestX pour générer un nouveau code de liaison."
+            )
+            await _send_reply(chat_id, reply)
+            return
+
         reply = (
             f"👋 Bienvenue sur <b>InvestX</b>, {first_name} !\n\n"
-            f"Votre <b>Chat ID</b> est :\n\n"
-            f"<code>{chat_id}</code>\n\n"
-            f"📋 Copiez ce numéro et collez-le dans la page "
-            f"<b>Intégrations → Telegram</b> de votre dashboard InvestX.\n\n"
-            f"Une fois lié, vous recevrez ici vos notifications d'achats DCA, "
-            f"d'erreurs et de changements d'abonnement."
+            f"Pour lier Telegram en toute sécurité :\n"
+            f"1. Ouvrez la page <b>Integrations → Telegram</b> dans InvestX\n"
+            f"2. Générez votre code de liaison\n"
+            f"3. Revenez ici via le lien automatique ou envoyez <code>/start CODE</code>\n\n"
+            f"🆔 Votre Chat ID de support est <code>{chat_id}</code>."
         )
         await _send_reply(chat_id, reply)
         logger.info("Sent chat_id %s to user %s (@%s)", chat_id, first_name, username)
@@ -48,7 +75,8 @@ async def _handle_message(message: dict) -> None:
     elif text.strip().startswith("/help"):
         reply = (
             "ℹ️ <b>Commandes disponibles</b>\n\n"
-            "/start – Obtenir votre Chat ID\n"
+            "/start CODE – Lier Telegram a votre compte InvestX\n"
+            "/start – Afficher l'aide de liaison\n"
             "/help – Afficher cette aide\n"
             "/id – Ré-afficher votre Chat ID"
         )
@@ -158,19 +186,28 @@ async def stop_bot() -> None:
 
 # ── Mode Webhook ──
 
-import os
 
-WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "investx-tg-webhook-default-secret")
+def get_webhook_secret() -> str:
+    """Retourne le secret webhook configuré."""
+    secret = settings.telegram_webhook_secret.strip()
+    if not secret:
+        raise RuntimeError("TELEGRAM_WEBHOOK_SECRET must be set when webhook mode is enabled")
+    return secret
 
 
 async def _setup_webhook() -> None:
     """Configure le webhook Telegram vers notre endpoint."""
-    webhook_url = f"{settings.app_base_url}/telegram/webhook/{WEBHOOK_SECRET}"
+    webhook_secret = get_webhook_secret()
+    webhook_url = f"{settings.app_base_url.rstrip('/')}/api/telegram/webhook"
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
                 f"{TELEGRAM_API}/setWebhook",
-                json={"url": webhook_url, "allowed_updates": ["message"]},
+                json={
+                    "url": webhook_url,
+                    "allowed_updates": ["message"],
+                    "secret_token": webhook_secret,
+                },
             )
             if resp.status_code == 200:
                 logger.info("Telegram webhook set to %s", webhook_url)

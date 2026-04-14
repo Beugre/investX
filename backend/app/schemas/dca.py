@@ -35,7 +35,7 @@ from app.core.constants import (
 
 class DCAConfigRead(BaseModel):
     enabled: bool = False
-    symbol: str = "BTCEUR"
+    symbol: str = "BTCUSDC"
     daily_amount_eur: float = 1.0
     execution_hour: int = 10
     execution_minute: int = 0

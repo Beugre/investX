@@ -4,12 +4,15 @@ Schémas Pydantic – Telegram.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
-class TelegramLink(BaseModel):
-    chat_id: str
-    username: str | None = None
+class TelegramLinkRequestRead(BaseModel):
+    link_code: str
+    expires_at: datetime
+    bot_url: str
 
 
 class TelegramSettingsRead(BaseModel):

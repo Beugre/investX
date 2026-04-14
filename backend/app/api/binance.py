@@ -28,7 +28,7 @@ async def connect_binance(
     payload: BinanceConnectRequest,
     uid: str = Depends(get_current_uid),
 ):
-    """Connecte un compte Binance : valide, vérifie permissions, stocke dans Secret Manager."""
+    """Connecte un compte Binance : valide, vérifie permissions, stocke les credentials chiffrés."""
     # 1. Valider les credentials
     valid = binance_service.validate_credentials(payload.api_key, payload.api_secret)
     if not valid:
@@ -44,7 +44,7 @@ async def connect_binance(
             "Please create a trading-only API key."
         )
 
-    # 3. Stocker dans Secret Manager
+    # 3. Stocker les credentials chiffrés
     secret_ref = secret_manager_service.create_or_update_binance_secret(
         uid, payload.api_key, payload.api_secret
     )

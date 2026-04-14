@@ -4,11 +4,20 @@ Job de vérification take-profit : vend automatiquement quand le prix cible est 
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.logger import get_logger
 from app.services import firestore_service, telegram_service
 from app.services.binance_service import get_symbol_price_no_auth
+from app.services.revolutx_service import get_symbol_price_no_auth as get_revolutx_price_no_auth
 
 logger = get_logger(__name__)
+
+
+def _get_public_price(symbol: str) -> float:
+    if "-" in symbol:
+        return get_revolutx_price_no_auth(symbol)
+    return get_symbol_price_no_auth(symbol)
 
 
 def check_take_profit_job() -> None:
@@ -30,7 +39,7 @@ def check_take_profit_job() -> None:
                     continue
 
                 try:
-                    current_price = get_symbol_price_no_auth(symbol)
+                    current_price = _get_public_price(symbol)
                     if not current_price or current_price < target_price:
                         continue
 
@@ -97,27 +106,27 @@ def _execute_take_profit(
 
         # Sauvegarder l'ordre
         order_data = {
-            "symbol": symbol,
-            "side": "SELL",
-            "quantity": sell_qty,
-            "price": current_price,
-            "amount_eur": sell_qty * current_price,
+            **order,
             "order_type": "take_profit",
+            "source": "take_profit",
             "exchange": exchange,
+            "executed_at": datetime.now(timezone.utc),
         }
         firestore_service.save_order(uid, order_data)
+        from app.services import portfolio_service
+        portfolio_service.refresh_snapshot(uid, symbol)
 
         # Désactiver la règle pour éviter les ventes multiples
         _disable_triggered_rule(uid, symbol, target_price)
 
         # Notification Telegram
         msg = (
-            f"💰 *Take-Profit exécuté*\n\n"
-            f"Paire : `{symbol}`\n"
-            f"Prix cible : `{target_price:,.2f}`\n"
-            f"Prix d'exécution : `{current_price:,.2f}`\n"
-            f"Quantité vendue : `{sell_qty:.8f}` ({sell_pct:.0f}%)\n"
-            f"Valeur : `{sell_qty * current_price:,.2f}`"
+            f"💰 <b>Take-Profit exécuté</b>\n\n"
+            f"Paire : <code>{symbol}</code>\n"
+            f"Prix cible : <code>{target_price:,.2f}</code>\n"
+            f"Prix d'exécution : <code>{order.get('price', current_price):,.2f}</code>\n"
+            f"Quantité vendue : <code>{order.get('quantity', sell_qty):.8f}</code> ({sell_pct:.0f}%)\n"
+            f"Valeur : <code>{order.get('amount_eur', sell_qty * current_price):,.2f}</code>"
         )
         try:
             tg = firestore_service.get_telegram_settings(uid)

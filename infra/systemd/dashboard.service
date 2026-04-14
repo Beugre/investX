@@ -8,7 +8,7 @@ Type=simple
 User=investx
 Group=investx
 WorkingDirectory=/opt/investx/dashboard
-ExecStart=/opt/investx/venv/bin/streamlit run streamlit_app.py \
+ExecStart=/opt/investx/venv/bin/streamlit run Accueil.py \
     --server.port 8601 \
     --server.headless true \
     --server.address 127.0.0.1 \

@@ -1313,8 +1313,7 @@ def backtest_rsi_v2(
         rsi = rsi_series[i]
         price = closes[i]
         date_ms = dates[i]
-        from datetime import datetime as dt
-        date_str = dt.utcfromtimestamp(date_ms / 1000).strftime("%Y-%m-%d")
+        date_str = datetime.fromtimestamp(date_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
 
         if rsi is None:
             daily_data.append({

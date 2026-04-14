@@ -298,11 +298,8 @@ def get_telegram_settings(token: str) -> dict:
     return _get("/telegram/settings", token)
 
 
-def link_telegram(token: str, chat_id: str, username: str | None = None) -> dict:
-    return _post("/telegram/link", token, json={
-        "chat_id": chat_id,
-        "username": username,
-    })
+def create_telegram_link_request(token: str) -> dict:
+    return _post("/telegram/link/request", token)
 
 
 def test_telegram(token: str) -> dict:

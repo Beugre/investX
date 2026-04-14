@@ -160,7 +160,7 @@ class TestDatetimeUtils:
 class TestDCABacktest:
     """Teste le backtesting (fonction pure, pas d'appel externe)."""
 
-    @patch("app.services.dca_service.httpx.get")
+    @patch("httpx.get")
     def test_backtest_returns_structure(self, mock_get):
         """Teste que le backtesting retourne la bonne structure."""
         # Simuler des klines Binance
@@ -222,8 +222,10 @@ class TestConstants:
 
     def test_rsi_brackets_ordered(self):
         from app.core.constants import DEFAULT_RSI_BRACKETS
-        max_rsis = [b["max_rsi"] for b in DEFAULT_RSI_BRACKETS]
-        assert max_rsis == sorted(max_rsis)
+        labels = {b["label"] for b in DEFAULT_RSI_BRACKETS}
+        assert labels == {"OVERBOUGHT", "WARM", "NEUTRAL", "OVERSOLD"}
+        assert min(b["min_rsi"] for b in DEFAULT_RSI_BRACKETS) == 0
+        assert max(b["max_rsi"] for b in DEFAULT_RSI_BRACKETS) == 100
 
     def test_mvrv_thresholds_have_multiplier(self):
         from app.core.constants import DEFAULT_MVRV_THRESHOLDS

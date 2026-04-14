@@ -10,28 +10,46 @@ from app.logger import get_logger
 logger = get_logger(__name__)
 
 
-def compute_avg_buy_price(orders: list[dict]) -> float:
-    """Calcule le prix moyen d'achat effectif (coût réel / quantité nette).
+def _order_sort_key(order: dict) -> tuple:
+    return (
+        order.get("executed_at") or order.get("created_at") or "",
+        order.get("order_id") or "",
+    )
 
-    Prend en compte le montant réellement dépensé et la quantité réellement
-    reçue pour donner le coût par unité *frais inclus*.
-    """
-    total_qty = 0.0
-    total_cost = 0.0
-    for o in orders:
-        if o.get("status") == "FILLED" and o.get("side") == "BUY":
-            qty = float(o.get("quantity", 0))
-            cost = float(o.get("amount_eur", 0))
-            total_qty += qty
-            total_cost += cost
-    return total_cost / total_qty if total_qty > 0 else 0.0
+
+def _normalize_order(order: dict) -> dict[str, float | str]:
+    """Normalise les ordres historiques pour un calcul de position cohérent."""
+    side = str(order.get("side", "BUY")).upper()
+    symbol = str(order.get("symbol", ""))
+    qty = float(order.get("quantity", 0) or 0)
+    amount = float(order.get("amount_eur", 0) or 0)
+    commission = float(order.get("commission", 0) or 0)
+    commission_asset = str(order.get("commission_asset", "") or "")
+
+    if side == "BUY" and "commission" not in order:
+        estimated_fee = qty * 0.001
+        qty = max(0.0, qty - estimated_fee)
+        amount = qty * float(order.get("price", 0) or 0)
+        commission = estimated_fee
+        if not commission_asset:
+            commission_asset = (
+                symbol.replace("USDC", "").replace("USDT", "").replace("EUR", "").replace("-", "")
+            )
+
+    return {
+        "side": side,
+        "quantity": qty,
+        "amount_eur": amount,
+        "commission": commission,
+        "commission_asset": commission_asset,
+    }
 
 
 def compute_snapshot(uid: str, symbol: str) -> dict:
     """Calcule le snapshot portfolio actuel pour un symbole."""
     orders = firestore_service.list_orders(uid, limit=1000, symbol=symbol)
     filled_orders = [
-        o for o in orders if o.get("status") == "FILLED" and o.get("side") == "BUY"
+        o for o in orders if str(o.get("status", "")).upper() in {"FILLED", "DONE", "COMPLETED"}
     ]
 
     if not filled_orders:
@@ -47,37 +65,31 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
         }
 
     total_qty = 0.0
-    total_invested = 0.0
+    total_cost_basis = 0.0
     total_commission = 0.0
     commission_asset = ""
 
-    for o in filled_orders:
-        qty = float(o.get("quantity", 0))
-        cost = float(o.get("amount_eur", 0))
+    for order in sorted(filled_orders, key=_order_sort_key):
+        normalized = _normalize_order(order)
+        side = str(normalized["side"])
+        qty = float(normalized["quantity"])
+        amount = float(normalized["amount_eur"])
+        total_commission += float(normalized["commission"])
+        if not commission_asset and normalized["commission_asset"]:
+            commission_asset = str(normalized["commission_asset"])
 
-        if "commission" in o:
-            # Nouvel ordre post-fix : quantity = nette, amount_eur = réel
-            total_commission += float(o.get("commission", 0))
-            if not commission_asset:
-                commission_asset = o.get("commission_asset", "")
-        else:
-            # Ancien ordre pré-fix : quantity = brute, amount_eur = demandé
-            # Appliquer les corrections estimées
-            estimated_fee = qty * 0.001          # 0.1 % Binance
-            qty -= estimated_fee                  # quantité nette estimée
-            cost = qty * float(o.get("price", 0))  # coût réel estimé
-            total_commission += estimated_fee
-            if not commission_asset:
-                # Déduire l'actif base du symbol
-                sym = o.get("symbol", "")
-                commission_asset = sym.replace("USDC", "").replace("USDT", "").replace("EUR", "")
+        if side == "BUY":
+            total_qty += qty
+            total_cost_basis += amount
+            continue
 
-        total_qty += qty
-        total_invested += cost
+        if side == "SELL" and total_qty > 0:
+            sell_qty = min(qty, total_qty)
+            avg_cost_before_sell = total_cost_basis / total_qty if total_qty > 0 else 0.0
+            total_qty -= sell_qty
+            total_cost_basis = max(0.0, total_cost_basis - (avg_cost_before_sell * sell_qty))
 
-    avg_price = compute_avg_buy_price(filled_orders)
-    # Recalcul depuis les données corrigées pour cohérence
-    avg_price = total_invested / total_qty if total_qty > 0 else 0.0
+    avg_price = total_cost_basis / total_qty if total_qty > 0 else 0.0
 
     # Récupérer le prix actuel via l'exchange approprié au symbole
     # Les symboles Revolut X utilisent le format "BTC-EUR", Binance "BTCUSDC"
@@ -105,13 +117,13 @@ def compute_snapshot(uid: str, symbol: str) -> dict:
             logger.info("Using last known price for %s/%s: %.2f", uid, symbol, market_price)
 
     market_value = total_qty * market_price
-    pnl_value = market_value - total_invested
-    pnl_percent = (pnl_value / total_invested * 100) if total_invested > 0 else 0.0
+    pnl_value = market_value - total_cost_basis
+    pnl_percent = (pnl_value / total_cost_basis * 100) if total_cost_basis > 0 else 0.0
 
     return {
         "symbol": symbol,
         "quantity_total": total_qty,
-        "invested_total_eur": total_invested,
+        "invested_total_eur": total_cost_basis,
         "avg_buy_price": avg_price,
         "market_price": market_price,
         "market_value_eur": market_value,

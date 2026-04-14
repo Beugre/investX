@@ -6,8 +6,8 @@
 - Python 3.11+
 - Compte Firebase avec Firestore activé
 - Compte Stripe (mode test)
-- Projet GCP avec Secret Manager API activée
-- Service account JSON avec permissions Firestore + Secret Manager
+- Projet GCP avec Firestore activé
+- Service account JSON avec permissions Firestore
 
 ### Installation
 
@@ -29,8 +29,8 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 # Dashboard (autre terminal)
 cd dashboard
-pip install streamlit requests pandas
-streamlit run streamlit_app.py
+pip install -r requirements.txt
+streamlit run Accueil.py
 ```
 
 ### Variables d'environnement à configurer
@@ -40,6 +40,8 @@ streamlit run streamlit_app.py
 - `STRIPE_WEBHOOK_SECRET` : secret webhook (whsec_...)
 - `STRIPE_PRICE_ID` : ID du prix d'abonnement
 - `TELEGRAM_BOT_TOKEN` : token du bot Telegram
+- `TELEGRAM_WEBHOOK_SECRET` : secret du webhook Telegram si `TELEGRAM_WEBHOOK_MODE=true`
+- `ENCRYPTION_KEY` : clé symétrique utilisée pour chiffrer les credentials exchange
 
 ### Secrets Streamlit
 Créer `dashboard/.streamlit/secrets.toml` :
@@ -93,6 +95,6 @@ curl -X POST http://localhost:8000/internal/run-dca-cycle
 |----------|----------|
 | Token Firebase invalide | Vérifier GOOGLE_APPLICATION_CREDENTIALS |
 | Webhook Stripe 400 | Vérifier STRIPE_WEBHOOK_SECRET |
-| Secret Manager permission denied | Vérifier IAM du service account |
+| Lecture/écriture des secrets chiffrés impossible | Vérifier Firestore et la variable `ENCRYPTION_KEY` |
 | Binance order failed | Vérifier que l'API key a la permission trading |
 | Telegram ne fonctionne pas | Vérifier TELEGRAM_BOT_TOKEN et chat_id |

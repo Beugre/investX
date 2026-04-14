@@ -4,7 +4,9 @@ Service Firestore – CRUD centralisé pour toutes les collections.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import secrets
+import string
 from typing import Any
 
 from google.cloud.firestore_v1 import FieldFilter
@@ -230,6 +232,82 @@ def update_telegram_settings(uid: str, data: dict[str, Any]) -> None:
         .document("main")
         .set(data, merge=True)
     )
+
+
+def create_telegram_link_request(uid: str, ttl_minutes: int = 10) -> dict[str, Any]:
+    """Crée ou réutilise une demande de liaison Telegram encore valide."""
+    now = datetime.now(timezone.utc)
+    coll = _db().collection("telegram_link_requests")
+
+    existing_docs = coll.where(filter=FieldFilter("uid", "==", uid)).stream()
+    for doc in existing_docs:
+        data = doc.to_dict()
+        expires_at = data.get("expires_at")
+        if expires_at and expires_at > now:
+            return {
+                "link_code": doc.id,
+                "expires_at": expires_at,
+            }
+        doc.reference.delete()
+
+    alphabet = string.ascii_uppercase + string.digits
+    code = "".join(secrets.choice(alphabet) for _ in range(8))
+    expires_at = now.replace(microsecond=0) + timedelta(minutes=ttl_minutes)
+
+    coll.document(code).set(
+        {
+            "uid": uid,
+            "created_at": now,
+            "expires_at": expires_at,
+        }
+    )
+    return {
+        "link_code": code,
+        "expires_at": expires_at,
+    }
+
+
+def consume_telegram_link_request(
+    code: str,
+    *,
+    chat_id: str,
+    username: str | None = None,
+) -> str | None:
+    """Consomme une demande de liaison si elle est valide, puis lie Telegram."""
+    now = datetime.now(timezone.utc)
+    ref = _db().collection("telegram_link_requests").document(code)
+    doc = ref.get()
+    if not doc.exists:
+        return None
+
+    data = doc.to_dict()
+    expires_at = data.get("expires_at")
+    uid = data.get("uid")
+    if not uid or not expires_at or expires_at <= now:
+        ref.delete()
+        return None
+
+    update_telegram_settings(
+        uid,
+        {
+            "enabled": True,
+            "chat_id": chat_id,
+            "username": username,
+            "notify_orders": True,
+            "notify_errors": True,
+            "notify_subscription": True,
+            "linked_at": now,
+        },
+    )
+    ref.delete()
+
+    stale_requests = _db().collection("telegram_link_requests").where(
+        filter=FieldFilter("uid", "==", uid)
+    ).stream()
+    for stale in stale_requests:
+        stale.reference.delete()
+
+    return uid
 
 
 # ────────────────────── Orders ──────────────────────

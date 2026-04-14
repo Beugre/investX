@@ -50,7 +50,7 @@ async def admin_overview(uid: str = Depends(_require_admin)):
         u = user["uid"]
         # Batch reads en parallèle au lieu de 2 appels séparés
         cfg_ref = db.collection("users").document(u).collection("dca_config").document("main")
-        v2_ref = db.collection("users").document(u).collection("dca_v2_config").document("main")
+        v2_ref = db.collection("users").document(u).collection("dca_config").document("v2")
         cfg_doc = cfg_ref.get()
         v2_doc = v2_ref.get()
         if cfg_doc.exists and cfg_doc.to_dict().get("enabled"):
@@ -75,7 +75,7 @@ async def admin_list_users(uid: str = Depends(_require_admin)):
         u = user["uid"]
         user_ref = db.collection("users").document(u)
         cfg_doc = user_ref.collection("dca_config").document("main").get()
-        v2_doc = user_ref.collection("dca_v2_config").document("main").get()
+        v2_doc = user_ref.collection("dca_config").document("v2").get()
         sub_doc = user_ref.collection("subscription").document("main").get()
         cfg = cfg_doc.to_dict() if cfg_doc.exists else None
         v2 = v2_doc.to_dict() if v2_doc.exists else None

@@ -7,7 +7,7 @@ Automatisez vos achats DCA crypto sur Binance avec un abonnement mensuel.
 - 🔐 Authentification Firebase (email/password)
 - 💳 Abonnement Stripe (checkout + webhooks)
 - 🟡 Connexion Binance (API trading only, sans retrait)
-- 🔒 Stockage sécurisé des clés via Google Secret Manager
+- 🔒 Stockage chiffré des clés exchange
 - ⚙️ Configuration DCA (paire, montant, heure)
 - 🤖 Scheduler automatique (achats quotidiens)
 - 📊 Dashboard Streamlit (KPIs, historique, portfolio)
@@ -22,7 +22,7 @@ Automatisez vos achats DCA crypto sur Binance avec un abonnement mensuel.
 | Dashboard | Streamlit |
 | Auth | Firebase Auth |
 | Base de données | Cloud Firestore |
-| Secrets | Google Secret Manager |
+| Secrets | Firestore chiffré (Fernet) |
 | Paiement | Stripe Subscriptions |
 | Trading | Binance API |
 | Notifications | Telegram Bot API |
@@ -50,7 +50,7 @@ uvicorn app.main:app --reload --port 8000
 
 # Dashboard (autre terminal)
 cd dashboard
-streamlit run streamlit_app.py
+streamlit run Accueil.py
 ```
 
 ## Documentation
@@ -62,7 +62,7 @@ streamlit run streamlit_app.py
 
 ## Paires supportées (MVP)
 
-`BTCEUR` · `ETHEUR` · `BNBEUR` · `ADAEUR` · `SOLEUR`
+`BTCUSDC` · `ETHUSDC` · `BNBUSDC` · `ADAUSDC` · `SOLUSDC` · `BTC-EUR` · `ETH-EUR`
 
 ## Sécurité
 

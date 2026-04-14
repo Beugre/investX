@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     # ── Telegram ──
     telegram_bot_token: str = Field(..., alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_mode: bool = Field(False, alias="TELEGRAM_WEBHOOK_MODE")
+    telegram_webhook_secret: str = Field("", alias="TELEGRAM_WEBHOOK_SECRET")
 
     # ── Binance ──
     binance_base_url: str = Field(
@@ -57,7 +58,7 @@ class Settings(BaseSettings):
         return [s.strip() for s in self.allowed_symbols.split(",") if s.strip()]
 
     model_config = {
-        "env_file": ".env",
+        "env_file": (".env", "backend/.env"),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

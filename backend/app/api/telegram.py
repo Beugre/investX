@@ -4,39 +4,37 @@ Endpoints Telegram : /telegram/link, /telegram/test, /telegram/settings
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 import hmac
 
 from app.core.auth_firebase import get_current_uid
+from app.core.exceptions import BadRequest
 from app.schemas.telegram import (
-    TelegramLink,
+    TelegramLinkRequestRead,
     TelegramSettingsRead,
     TelegramSettingsUpdate,
 )
-from app.services import firestore_service, telegram_service, audit_service
+from app.services import firestore_service, telegram_service
 
 router = APIRouter(prefix="/telegram", tags=["Telegram"])
 
 
-@router.post("/link")
-async def link_telegram(
-    payload: TelegramLink,
-    uid: str = Depends(get_current_uid),
-):
-    """Lie un chat Telegram à l'utilisateur."""
-    firestore_service.update_telegram_settings(
-        uid,
-        {
-            "enabled": True,
-            "chat_id": payload.chat_id,
-            "username": payload.username,
-            "notify_orders": True,
-            "notify_errors": True,
-            "notify_subscription": True,
-        },
+@router.post("/link/request", response_model=TelegramLinkRequestRead)
+async def create_telegram_link_request(uid: str = Depends(get_current_uid)):
+    """Génère un code à envoyer au bot Telegram pour prouver la possession du chat."""
+    link = firestore_service.create_telegram_link_request(uid)
+    code = link["link_code"]
+    return TelegramLinkRequestRead(
+        link_code=code,
+        expires_at=link["expires_at"],
+        bot_url=f"https://t.me/InvestX_The_Bot?start={code}",
     )
-    audit_service.log_telegram_linked(uid, payload.chat_id)
-    return {"message": "Telegram linked successfully"}
+
+
+@router.post("/link")
+async def link_telegram_legacy(uid: str = Depends(get_current_uid)):
+    """Ancien endpoint manuel désactivé pour éviter l'usurpation de chat_id."""
+    raise BadRequest("Manual Telegram linking is disabled. Use /telegram/link/request.")
 
 
 @router.post("/test")
@@ -72,13 +70,19 @@ async def update_telegram_settings(
     return TelegramSettingsRead(**{**data, **(firestore_service.get_telegram_settings(uid) or {})})
 
 
-@router.post("/webhook/{secret}")
-async def telegram_webhook(secret: str, request: Request):
+@router.post("/webhook")
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
     """Reçoit les updates Telegram via webhook."""
-    from app.services.telegram_bot import WEBHOOK_SECRET, handle_webhook_update
+    from app.services.telegram_bot import get_webhook_secret, handle_webhook_update
 
-    if not hmac.compare_digest(secret, WEBHOOK_SECRET):
-        return {"ok": False}
+    webhook_secret = get_webhook_secret()
+    if not x_telegram_bot_api_secret_token or not hmac.compare_digest(
+        x_telegram_bot_api_secret_token, webhook_secret
+    ):
+        raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
 
     update = await request.json()
     await handle_webhook_update(update)
