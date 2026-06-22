@@ -187,11 +187,6 @@ def _recently_executed(uid: str, symbol: str) -> bool:
 
 def execute_user_dca(uid: str) -> dict | None:
     """Exécute le DCA pour un utilisateur (v1 simple ou dispatch v2)."""
-    # 1. Vérifier abonnement
-    if not subscription_service.is_active(uid):
-        logger.info("Skipping DCA for user %s: subscription not active", uid)
-        return None
-
     # Vérifier si v2
     v2_config = firestore_service.get_dca_v2_config(uid)
     if v2_config and v2_config.get("enabled"):

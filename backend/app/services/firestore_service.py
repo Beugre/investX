@@ -59,7 +59,8 @@ def create_user(uid: str, data: dict[str, Any]) -> None:
 
 def update_user(uid: str, data: dict[str, Any]) -> None:
     data["updated_at"] = datetime.now(timezone.utc)
-    _db().collection("users").document(uid).update(data)
+    # set(merge=True) crée le document s'il n'existe pas encore (nouveaux comptes)
+    _db().collection("users").document(uid).set(data, merge=True)
 
 
 # ────────────────────── Subscription ──────────────────────

@@ -114,8 +114,6 @@ async def force_execute_dca_v2(uid: str = Depends(get_current_uid)):
     config = firestore_service.get_dca_v2_config(uid)
     if not config or not config.get("enabled"):
         return {"message": "DCA v2 not enabled", "executed": False}
-    if not subscription_service.is_active(uid):
-        return {"message": "Abonnement inactif", "executed": False}
     result = dca_service._execute_user_dca_v2(uid, config, force_now=True)
     if result and isinstance(result, dict) and result.get("_no_orders"):
         errors = result.get("errors", [])

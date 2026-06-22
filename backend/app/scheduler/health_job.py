@@ -23,6 +23,9 @@ HEALTH_URL = "http://127.0.0.1:8600/health"
 
 def health_check_job() -> None:
     """Vérifie la santé du backend et alerte l'admin si dégradé."""
+    # En dev local, le dashboard Streamlit (port 8600) n'est pas lancé — on skip
+    if settings.app_env != "production":
+        return
     try:
         response = httpx.get(HEALTH_URL, timeout=10)
 

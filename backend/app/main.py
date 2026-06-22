@@ -84,6 +84,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _default_origins = [
     "https://investxbot.com",
     "https://www.investxbot.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:8501",
     "http://localhost:8601",
 ]
